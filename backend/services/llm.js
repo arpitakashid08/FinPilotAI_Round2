@@ -2,6 +2,8 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
 
 function clean(text = "") {
   return `${text}`.trim().replace(/\s+/g, " ");
@@ -51,7 +53,38 @@ async function askGemini(prompt) {
   return clean(data?.candidates?.[0]?.content?.parts?.[0]?.text || "");
 }
 
+async function askGroq(prompt) {
+  if (!GROQ_API_KEY) return "";
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [
+        { role: "system", content: "You are Astro, a concise fintech copilot. Respond in plain English with direct, practical advice." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.4,
+      max_tokens: 220,
+    }),
+  });
+
+  if (!res.ok) throw new Error(`groq_${res.status}`);
+  const data = await res.json();
+  return clean(data?.choices?.[0]?.message?.content || "");
+}
+
 export async function generateAssistantReply(prompt) {
+  try {
+    const groqReply = await askGroq(prompt);
+    if (groqReply) return { reply: groqReply, provider: "groq" };
+  } catch {
+    // fall through to OpenAI/Gemini/local fallback
+  }
+
   try {
     const openaiReply = await askOpenAI(prompt);
     if (openaiReply) return { reply: openaiReply, provider: "openai" };
