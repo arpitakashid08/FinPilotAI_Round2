@@ -955,18 +955,25 @@ function AskAstro({ updates }) {
   const [msgs, setMsgs] = useState([{ role:"ai", text:"Hi! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy." }]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [chatErr, setChatErr] = useState("");
   const ref = useRef(null);
   const knowledge = updates?.knowledge || [];
   useEffect(() => { ref.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
 
   const send = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || thinking) return;
     const q = input.trim(); setInput("");
+    setChatErr("");
     setMsgs(m => [...m, { role:"user", text:q }]);
     setThinking(true);
-    const result = await api.askAstro({ message: q });
-    setMsgs(m => [...m, { role:"ai", text: result.reply }]);
-    setThinking(false);
+    try {
+      const result = await api.askAstro({ message: q });
+      setMsgs(m => [...m, { role:"ai", text: result.reply || "I couldn't generate a response yet. Please try once more." }]);
+    } catch {
+      setChatErr("Ask Astro is temporarily unavailable. Please retry.");
+    } finally {
+      setThinking(false);
+    }
   };
 
   return (
@@ -1013,11 +1020,14 @@ function AskAstro({ updates }) {
           padding:"13px 22px", background:"linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))",
           border:"1px solid rgba(99,179,255,0.3)", borderRadius:14, color:"#63b3ff",
           fontWeight:700, fontSize:16, transition:"all 0.2s",
+          opacity: thinking ? 0.6 : 1,
         }}
           onMouseEnter={e=>e.currentTarget.style.background="linear-gradient(135deg,rgba(99,179,255,0.3),rgba(167,139,250,0.3))"}
           onMouseLeave={e=>e.currentTarget.style.background="linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))"}
-        >↑</button>
+          disabled={thinking}
+        >{thinking ? "…" : "↑"}</button>
       </div>
+      {!!chatErr && <div style={{ marginTop:8, color:"#f87171", fontSize:12 }}>{chatErr}</div>}
 
       <div className="sphere-row" style={{ marginTop:20, display:"flex", gap:18, alignItems:"stretch", flexWrap:"wrap" }}>
         <div style={{ flex:1, minWidth:240 }}>
@@ -1182,20 +1192,20 @@ function HexNews({ title, cat, time, sentiment, delay }) {
   const borderColor = sentiment === "bullish" ? "#34d399" : sentiment === "bearish" ? "#f87171" : "#63b3ff";
   return (
     <div style={{
-      position:"relative", width:180, height:100,
+      position:"relative", width:220, minHeight:132,
       clipPath:"polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)",
       background:"rgba(255,255,255,0.03)",
       border:`1px solid ${borderColor}30`,
-      padding:"16px 20px", display:"flex", flexDirection:"column", justifyContent:"center",
+      padding:"20px 24px", display:"flex", flexDirection:"column", justifyContent:"center",
       animation:`fadeUp 0.4s ease ${delay}s both`,
       transition:"all 0.2s",
     }}
       onMouseEnter={e => { e.currentTarget.style.background = `${borderColor}10`; e.currentTarget.style.borderColor = `${borderColor}60`; }}
       onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = `${borderColor}30`; }}
     >
-      <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.1em", color:`${borderColor}`, marginBottom:4, fontWeight:700 }}>{cat}</div>
-      <div style={{ fontSize:11, lineHeight:1.4, marginBottom:6, fontWeight:600 }}>{title}</div>
-      <div style={{ fontSize:9, color:"rgba(226,234,255,0.3)", fontFamily:"'JetBrains Mono', monospace" }}>{time}</div>
+      <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.1em", color:`${borderColor}`, marginBottom:6, fontWeight:700 }}>{cat}</div>
+      <div style={{ fontSize:17, lineHeight:1.45, marginBottom:7, fontWeight:700 }}>{title}</div>
+      <div style={{ fontSize:12, color:"rgba(226,234,255,0.48)", fontFamily:"'JetBrains Mono', monospace" }}>{time}</div>
     </div>
   );
 }
@@ -1239,16 +1249,16 @@ function KnowledgePill({ question, answer, delay }) {
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10 }}>
         <div style={{ display:"flex", alignItems:"center", gap:10, flex:1 }}>
           <span style={{ fontSize:16, filter:"drop-shadow(0 0 4px #63b3ff)" }}>💡</span>
-          <span style={{ fontSize:13, fontWeight:600 }}>{question}</span>
+          <span style={{ fontSize:16, fontWeight:700, lineHeight:1.4 }}>{question}</span>
         </div>
-        <span style={{ fontSize:14, color:"rgba(226,234,255,0.4)", transition:"transform 0.3s", transform:open?"rotate(180deg)":"rotate(0)" }}>▼</span>
+        <span style={{ fontSize:16, color:"rgba(226,234,255,0.4)", transition:"transform 0.3s", transform:open?"rotate(180deg)":"rotate(0)" }}>▼</span>
       </div>
       <div style={{
         maxHeight:open?200:0, opacity:open?1:0,
         transition:"all 0.3s ease", overflow:"hidden",
         marginTop:open?12:0,
       }}>
-        <div style={{ fontSize:12, lineHeight:1.7, color:"rgba(226,234,255,0.6)", borderTop:"1px solid rgba(255,255,255,0.05)", paddingTop:12 }}>
+        <div style={{ fontSize:15, lineHeight:1.75, color:"rgba(226,234,255,0.72)", borderTop:"1px solid rgba(255,255,255,0.05)", paddingTop:12 }}>
           {answer}
         </div>
       </div>
@@ -1330,6 +1340,7 @@ function InvestorProfile({ name, title, quote, achievement, delay }) {
 // Voice Assistant component for Ask Astro  
 function VoiceAssistant() {
   const [listening, setListening] = useState(false);
+  const [thinking, setThinking] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("");
   const [err, setErr] = useState("");
@@ -1347,6 +1358,7 @@ function VoiceAssistant() {
     setErr("");
     setReply("");
     setTranscript("");
+    setThinking(false);
     setListening(true);
     const rec = new Rec();
     rec.lang = "en-US";
@@ -1356,8 +1368,22 @@ function VoiceAssistant() {
       const text = Array.from(event.results).map((r) => r[0]?.transcript || "").join(" ").trim();
       setTranscript(text);
       if (event.results[event.results.length - 1]?.isFinal && text) {
-        const r = await api.voiceReply({ transcript: text });
-        setReply(r.reply || "");
+        try {
+          setThinking(true);
+          const r = await api.voiceReply({ transcript: text });
+          setReply(r.reply || "");
+          if (r.reply && window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(r.reply);
+            u.rate = 1;
+            u.pitch = 1;
+            window.speechSynthesis.speak(u);
+          }
+        } catch {
+          setErr("Could not fetch voice reply. Please try again.");
+        } finally {
+          setThinking(false);
+        }
       }
     };
     rec.onerror = () => {
@@ -1389,6 +1415,8 @@ function VoiceAssistant() {
       <div style={{ fontSize:12, color:"rgba(226,234,255,0.5)", minHeight:40 }}>
         {listening ? (
           <div style={{ animation:"blink 1s ease-in-out infinite" }}>Listening...</div>
+        ) : thinking ? (
+          <div style={{ animation:"blink 1s ease-in-out infinite", color:"#63b3ff" }}>Thinking...</div>
         ) : transcript ? (
           <div style={{ color:"#63b3ff" }}>"{transcript}"</div>
         ) : (
