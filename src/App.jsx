@@ -1193,10 +1193,10 @@ function HexNews({ title, cat, time, sentiment, delay }) {
   return (
     <div style={{
       position:"relative", width:280, minHeight:178,
-      clipPath:"polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)",
+      clipPath:"polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%)",
       background:"rgba(255,255,255,0.045)",
       border:`1px solid ${borderColor}45`,
-      padding:"26px 34px", display:"flex", flexDirection:"column", justifyContent:"center",
+      padding:"24px 18px", display:"flex", alignItems:"center", justifyContent:"center",
       animation:`fadeUp 0.4s ease ${delay}s both`,
       transition:"all 0.2s",
       boxShadow:`0 0 22px ${borderColor}22`,
@@ -1204,13 +1204,15 @@ function HexNews({ title, cat, time, sentiment, delay }) {
       onMouseEnter={e => { e.currentTarget.style.background = `${borderColor}10`; e.currentTarget.style.borderColor = `${borderColor}60`; }}
       onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = `${borderColor}30`; }}
     >
-      <div style={{ fontSize:13, textTransform:"uppercase", letterSpacing:"0.14em", color:`${borderColor}`, marginBottom:10, fontWeight:800 }}>{cat}</div>
-      <div style={{
-        fontSize:21, lineHeight:1.42, marginBottom:10, fontWeight:800, color:"#eef6ff",
-        textShadow:"0 0 10px rgba(0,0,0,0.35)",
-        display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden",
-      }}>{title}</div>
-      <div style={{ fontSize:13, color:"rgba(226,234,255,0.65)", fontFamily:"'JetBrains Mono', monospace", fontWeight:500 }}>{time}</div>
+      <div style={{ width:"78%", minWidth:0 }}>
+        <div style={{ fontSize:13, textTransform:"uppercase", letterSpacing:"0.14em", color:`${borderColor}`, marginBottom:10, fontWeight:800 }}>{cat}</div>
+        <div style={{
+          fontSize:21, lineHeight:1.42, marginBottom:10, fontWeight:800, color:"#eef6ff",
+          textShadow:"0 0 10px rgba(0,0,0,0.35)",
+          display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden",
+        }}>{title}</div>
+        <div style={{ fontSize:13, color:"rgba(226,234,255,0.7)", fontFamily:"'JetBrains Mono', monospace", fontWeight:600 }}>{time}</div>
+      </div>
     </div>
   );
 }
