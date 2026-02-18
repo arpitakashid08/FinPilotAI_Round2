@@ -1,14 +1,76 @@
 // FinPilot AI — Sphere Edition
 // Design: 3D glowing orbs, starfield, NO rectangular cards
 // Inspired by AstroFin mockup: organic spheres, particle fields, orbital data
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+const fallbackProfile = { name: "Arjun Sharma", email: "arjun@finpilot.ai", balance: 124500, riskScore: 0.28, lastLogin: "Feb 17, 2026" };
+const fallbackUpdates = {
+  latestFinance: [
+    { title: "RBI hints at cautious rate path amid inflation softening", cat: "Macro", time: "2h ago", sentiment: "neutral" },
+    { title: "Digital lending growth accelerates across tier-2 markets", cat: "Fintech", time: "4h ago", sentiment: "bullish" },
+    { title: "Global bond yields stabilize after volatile session", cat: "Bonds", time: "6h ago", sentiment: "neutral" },
+  ],
+  stockAlerts: [
+    { ticker: "NIFTY", price: 22840, change: 0.86, color: "#34d399" },
+    { ticker: "BANKNIFTY", price: 48820, change: -0.42, color: "#f87171" },
+    { ticker: "RELIANCE", price: 2934, change: 1.12, color: "#63b3ff" },
+  ],
+  knowledge: [
+    { question: "What is credit utilization?", answer: "It is your used credit divided by total credit limit. Keeping it under 30% can significantly improve your score." },
+    { question: "How do repo rates affect EMIs?", answer: "When policy rates rise, floating-rate loans usually become costlier and monthly EMIs can increase." },
+    { question: "Why does fraud monitoring flag device changes?", answer: "First-time device + unusual transaction pattern is a common anomaly signal to prevent account takeover." },
+  ],
+};
+
+async function callApi(path, opts = {}, fallback) {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, opts);
+    if (!res.ok) throw new Error("request_failed");
+    return await res.json();
+  } catch {
+    await delay(350);
+    return typeof fallback === "function" ? fallback() : fallback;
+  }
+}
+
 const api = {
-  login:      async () => { await delay(900); return { otpSent: true }; },
-  verifyOTP:  async ({ otp }) => { await delay(700); return otp === "123456" ? { success: true, token: "fp" } : { success: false, message: "Wrong OTP — try 123456" }; },
-  signup:     async () => { await delay(800); return { success: true }; },
-  getProfile: async () => { await delay(400); return { name: "Arjun Sharma", email: "arjun@finpilot.ai", balance: 124500, riskScore: 0.28, lastLogin: "Feb 17, 2026" }; },
+  login: async ({ email = "", password = "" } = {}) =>
+    callApi("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    }, { otpSent: true }),
+  verifyOTP: async ({ otp }) =>
+    callApi("/auth/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ otp }),
+    }, otp === "123456" ? { success: true, token: "fp-local" } : { success: false, message: "Wrong OTP — try 123456" }),
+  signup: async ({ name = "", email = "", password = "" } = {}) =>
+    callApi("/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password }),
+    }, { success: true }),
+  getProfile: async (token = "") =>
+    callApi("/auth/profile", {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }, fallbackProfile),
+  getUpdates: async () => callApi("/updates", {}, fallbackUpdates),
+  voiceReply: async ({ transcript = "" }) =>
+    callApi("/voice/reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcript }),
+    }, { transcript, reply: "Voice noted. Market remains mixed with selective upside in high-quality assets." }),
+  askAstro: async ({ message = "" }) =>
+    callApi("/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    }, { reply: "Based on your current patterns, keep exposure diversified and track repayment health weekly." }),
 };
 const twin = { income: 85000, spending: 42000, liabilities: 12000, cashFlow: 31000, riskScore: 0.28 };
 
@@ -441,7 +503,7 @@ function Login({ onSuccess, goSignup }) {
 
   const go = async () => {
     setErr(""); setL(true);
-    if (!sent) { await api.login(); setSent(true); }
+    if (!sent) { await api.login({ email, password: pass }); setSent(true); }
     else { const r = await api.verifyOTP({ otp }); if (r.success) onSuccess(r.token); else setErr(r.message); }
     setL(false);
   };
@@ -504,7 +566,7 @@ function Signup({ goLogin }) {
         <Input placeholder="Full name" value={name} onChange={e=>setName(e.target.value)} icon="◈" />
         <Input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} icon="✉" />
         <Input placeholder="Password" type="password" value={pass} onChange={e=>setPass(e.target.value)} icon="◉" />
-        <Btn onClick={async()=>{ setL(true); await api.signup(); setL(false); setDone(true); }} loading={loading}>Create Account →</Btn>
+        <Btn onClick={async()=>{ setL(true); await api.signup({ name, email, password: pass }); setL(false); setDone(true); }} loading={loading}>Create Account →</Btn>
       </div>
       <div style={{ textAlign:"center", marginTop:20, fontSize:13, color:"rgba(226,234,255,0.35)" }}>
         Have account?{" "}<span onClick={goLogin} style={{ color:"#63b3ff", cursor:"pointer", fontWeight:600 }}>Sign in</span>
@@ -517,7 +579,7 @@ function Signup({ goLogin }) {
 const NAV = [
   { id:"home",      icon:"⬡", label:"Overview"          },
   { id:"astrofin",  icon:"◈", label:"AstroFin Twin"     },
-  { id:"credit",    icon:"◆", label:"Credit Improver"   },
+  { id:"creditai",  icon:"◆", label:"AI Credit Score Improver" },
   { id:"loan",      icon:"↯", label:"Loan Simulator"    },
   { id:"fraud",     icon:"◉", label:"Fraud Alerts"      },
   { id:"ai",        icon:"✦", label:"Ask Astro"          },
@@ -642,13 +704,16 @@ function OrbitLabel({ value, label, color, x, y }) {
 }
 
 // ── HOME PAGE ─────────────────────────────────────────────────
-function Home({ user }) {
+function Home({ user, updates }) {
   const metrics = [
     { value:`₹${twin.income.toLocaleString("en-IN")}`,   label:"Income",    color:"#34d399", x:"68%", y:"12%" },
     { value:`₹${twin.spending.toLocaleString("en-IN")}`,  label:"Spending",  color:"#fbbf24", x:"72%", y:"52%" },
     { value:`₹${twin.cashFlow.toLocaleString("en-IN")}`,  label:"Cash Flow", color:"#63b3ff", x:"5%",  y:"20%" },
     { value:`₹${twin.liabilities.toLocaleString("en-IN")}`,label:"Liabilities",color:"#f87171",x:"2%",y:"62%"},
   ];
+  const latestFinance = updates?.latestFinance || [];
+  const stockAlerts = updates?.stockAlerts || [];
+  const knowledge = updates?.knowledge || [];
   return (
     <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:36 }}>
       <div>
@@ -702,12 +767,40 @@ function Home({ user }) {
           ))}
         </div>
       </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+        <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(226,234,255,0.4)" }}>Latest Finance Updates</div>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:14 }}>
+          {latestFinance.map((item, i) => (
+            <HexNews key={`${item.title}-${i}`} title={item.title} cat={item.cat} time={item.time} sentiment={item.sentiment} delay={i * 0.08} />
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))", gap:14 }}>
+        {stockAlerts.map((s, i) => (
+          <StockTicker key={`${s.ticker}-${i}`} ticker={s.ticker} price={s.price} change={s.change} color={s.color} />
+        ))}
+      </div>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(99,179,255,0.7)" }}>Do You Know?</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))", gap:10 }}>
+          {knowledge.slice(0, 2).map((k, i) => (
+            <DoYouKnowButton key={`home-btn-${i}`} question={k.question} answer={k.answer} />
+          ))}
+        </div>
+        {knowledge.slice(0, 2).map((k, i) => (
+          <KnowledgePill key={`${k.question}-${i}`} question={k.question} answer={k.answer} delay={i * 0.1} />
+        ))}
+      </div>
     </div>
   );
 }
 
 // ── ASTROFIN PAGE ─────────────────────────────────────────────
-function AstroFin() {
+function AstroFin({ updates }) {
+  const latestFinance = updates?.latestFinance || [];
   return (
     <div style={{ animation:"fadeIn 0.4s ease" }}>
       <div style={{ marginBottom:32 }}>
@@ -742,6 +835,14 @@ function AstroFin() {
               Twin projects <span style={{ color:"#34d399", fontWeight:700 }}>36.5% savings rate</span>. Debt service at <span style={{ color:"#fbbf24", fontWeight:700 }}>14.1%</span>. Modeled net worth: <span style={{ color:"#a78bfa", fontWeight:700 }}>+12.4% YoY</span>.
             </div>
           </div>
+        </div>
+      </div>
+      <div style={{ marginTop:22 }}>
+        <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(52,211,153,0.65)", marginBottom:12 }}>Twin Context Feed</div>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:12 }}>
+          {latestFinance.map((item, i) => (
+            <HexNews key={`astro-${item.title}-${i}`} title={item.title} cat={item.cat} time={item.time} sentiment={item.sentiment} delay={i * 0.08} />
+          ))}
         </div>
       </div>
     </div>
@@ -850,25 +951,21 @@ function Fraud() {
 }
 
 // ── AI CHAT (Ask Astro) ───────────────────────────────────────
-function AskAstro() {
+function AskAstro({ updates }) {
   const [msgs, setMsgs] = useState([{ role:"ai", text:"Hi! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy." }]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const ref = useRef(null);
+  const knowledge = updates?.knowledge || [];
   useEffect(() => { ref.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
 
   const send = async () => {
     if (!input.trim()) return;
     const q = input.trim(); setInput("");
     setMsgs(m => [...m, { role:"user", text:q }]);
-    setThinking(true); await delay(800 + Math.random()*500);
-    const lo = q.toLowerCase();
-    const r = lo.includes("loan") ? "Based on your twin, you can support ₹18,500/month EMI while keeping a safe buffer. At 9% for 24 months, that's ~₹4.1L borrowing capacity." :
-              lo.includes("fraud") ? "3 alerts this week — 1 critical. Moscow-based IP mismatch on a ₹12,500 transaction. It's been auto-frozen. Review it?" :
-              lo.includes("risk")  ? "Risk score: 0.28 — top 15% of account holders. Low debt, stable income, diversified patterns." :
-              lo.includes("invest") ? "With ₹31K/month free cash, I'd suggest: 40% index funds, 30% FDs, 30% liquid. Want a 5-year projection?" :
-              "Great question! Based on your financial fingerprint, I see an interesting pattern here. Want me to run a scenario analysis for you?";
-    setMsgs(m => [...m, { role:"ai", text:r }]);
+    setThinking(true);
+    const result = await api.askAstro({ message: q });
+    setMsgs(m => [...m, { role:"ai", text: result.reply }]);
     setThinking(false);
   };
 
@@ -921,15 +1018,29 @@ function AskAstro() {
           onMouseLeave={e=>e.currentTarget.style.background="linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))"}
         >↑</button>
       </div>
+
+      <div className="sphere-row" style={{ marginTop:20, display:"flex", gap:18, alignItems:"stretch", flexWrap:"wrap" }}>
+        <div style={{ flex:1, minWidth:240 }}>
+          <VoiceAssistant />
+        </div>
+        <div style={{ flex:1, minWidth:240, display:"flex", flexDirection:"column", gap:10 }}>
+          <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(99,179,255,0.7)" }}>Do You Know Buttons</div>
+          {knowledge.slice(0, 2).map((k, i) => (
+            <KnowledgePill key={`astro-know-${i}`} question={k.question} answer={k.answer} delay={i * 0.08} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
 // ── ANALYTICS ─────────────────────────────────────────────────
-function Analytics() {
+function Analytics({ updates }) {
   const months = ["Aug","Sep","Oct","Nov","Dec","Jan","Feb"];
   const income  = [72,78,75,82,85,80,85];
   const spend   = [38,42,39,44,48,41,42];
+  const stockAlerts = updates?.stockAlerts || [];
+  const knowledge = updates?.knowledge || [];
   return (
     <div style={{ animation:"fadeIn 0.4s ease" }}>
       <div style={{ fontSize:28, fontWeight:800, marginBottom:8 }}>▲ <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Analytics</span></div>
@@ -956,6 +1067,38 @@ function Analytics() {
             ))}
           </div>
         </div>
+      </div>
+      <div style={{ marginTop:24, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))", gap:14 }}>
+        {stockAlerts.map((s, i) => (
+          <StockTicker key={`analytics-${s.ticker}-${i}`} ticker={s.ticker} price={s.price} change={s.change} color={s.color} />
+        ))}
+      </div>
+      <div style={{ marginTop:18, display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(167,139,250,0.75)" }}>Fintech Knowledge Pulse</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))", gap:10 }}>
+          {knowledge.slice(0, 2).map((k, i) => (
+            <DoYouKnowButton key={`analytics-btn-${i}`} question={k.question} answer={k.answer} />
+          ))}
+        </div>
+        {knowledge.slice(1, 3).map((k, i) => (
+          <KnowledgePill key={`analytics-know-${i}`} question={k.question} answer={k.answer} delay={i * 0.1} />
+        ))}
+      </div>
+      <div style={{ marginTop:18, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))", gap:12 }}>
+        <InvestorProfile
+          name="Radhika Menon"
+          title="Fintech Portfolio Strategist"
+          quote="In uncertain markets, cash flow quality beats short-term momentum."
+          achievement="Backtested 14% drawdown reduction with staggered allocation rules."
+          delay={0}
+        />
+        <InvestorProfile
+          name="Kabir Shah"
+          title="Risk & Fraud Research Lead"
+          quote="Device intelligence combined with behavioral velocity catches fraud earlier."
+          achievement="Reduced false positives by 22% using dynamic threshold scoring."
+          delay={0.12}
+        />
       </div>
     </div>
   );
@@ -995,7 +1138,7 @@ function Settings({ user }) {
 const BOTTOM_NAV = [
   { id:"home",     icon:"⬡", label:"Home"    },
   { id:"astrofin", icon:"◈", label:"Twin"    },
-  { id:"credit",   icon:"◆", label:"Credit"  },
+  { id:"creditai", icon:"◆", label:"Credit"  },
   { id:"loan",     icon:"↯", label:"Loan"    },
   { id:"ai",       icon:"✦", label:"Astro"   },
 ];
@@ -1113,6 +1256,37 @@ function KnowledgePill({ question, answer, delay }) {
   );
 }
 
+function DoYouKnowButton({ question, answer }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          padding:"12px 18px",
+          color:"#63b3ff",
+          fontSize:12,
+          fontWeight:700,
+          letterSpacing:"0.08em",
+          textTransform:"uppercase",
+          background:"rgba(99,179,255,0.08)",
+          border:"1px solid rgba(99,179,255,0.3)",
+          clipPath:"polygon(8% 0, 92% 0, 100% 50%, 92% 100%, 8% 100%, 0 50%)",
+          transition:"all 0.2s ease",
+        }}
+      >
+        Do You Know
+      </button>
+      {open && (
+        <div style={{ fontSize:12, lineHeight:1.7, color:"rgba(226,234,255,0.6)", padding:"0 6px" }}>
+          <div style={{ color:"#e2eaff", fontWeight:700, marginBottom:4 }}>{question}</div>
+          {answer}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Investor Profile card
 function InvestorProfile({ name, title, quote, achievement, delay }) {
   return (
@@ -1157,18 +1331,41 @@ function InvestorProfile({ name, title, quote, achievement, delay }) {
 function VoiceAssistant() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [reply, setReply] = useState("");
+  const [err, setErr] = useState("");
 
   const toggleListen = () => {
-    if (!listening) {
-      setListening(true);
-      setTimeout(() => {
-        setTranscript("What's my credit score projection?");
-        setListening(false);
-      }, 2000);
-    } else {
+    if (listening) {
       setListening(false);
-      setTranscript("");
+      return;
     }
+    const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Rec) {
+      setErr("Speech recognition is not supported in this browser.");
+      return;
+    }
+    setErr("");
+    setReply("");
+    setTranscript("");
+    setListening(true);
+    const rec = new Rec();
+    rec.lang = "en-US";
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    rec.onresult = async (event) => {
+      const text = Array.from(event.results).map((r) => r[0]?.transcript || "").join(" ").trim();
+      setTranscript(text);
+      if (event.results[event.results.length - 1]?.isFinal && text) {
+        const r = await api.voiceReply({ transcript: text });
+        setReply(r.reply || "");
+      }
+    };
+    rec.onerror = () => {
+      setErr("Microphone error. Please allow mic access and retry.");
+      setListening(false);
+    };
+    rec.onend = () => setListening(false);
+    rec.start();
   };
 
   return (
@@ -1198,6 +1395,8 @@ function VoiceAssistant() {
           "Tap mic to speak"
         )}
       </div>
+      {!!reply && <div style={{ fontSize:12, color:"rgba(52,211,153,0.9)", marginTop:8, lineHeight:1.6 }}>{reply}</div>}
+      {!!err && <div style={{ fontSize:11, color:"#f87171", marginTop:8 }}>{err}</div>}
     </div>
   );
 }
@@ -1306,12 +1505,20 @@ function CreditScore({ user }) {
 // ── SHELL ─────────────────────────────────────────────────────
 function Shell({ token }) {
   const [user, setUser] = useState(null);
+  const [updates, setUpdates] = useState(fallbackUpdates);
   const [loading, setL] = useState(true);
   const [active, setA]  = useState("home");
   const [col, setCol]   = useState(false);
   const mobile = useIsMobile();
 
-  useEffect(() => { api.getProfile().then(setUser).finally(()=>setL(false)); }, [token]);
+  useEffect(() => {
+    Promise.all([api.getProfile(token), api.getUpdates()])
+      .then(([profile, feed]) => {
+        setUser(profile);
+        setUpdates(feed);
+      })
+      .finally(() => setL(false));
+  }, [token]);
 
   if (loading) return (
     <div style={{ position:"fixed", inset:0, background:"#030712", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:20 }}>
@@ -1323,7 +1530,16 @@ function Shell({ token }) {
     </div>
   );
 
-  const pages = { home:<Home user={user}/>, astrofin:<AstroFin/>, credit:<CreditScore user={user}/>, loan:<Loan/>, fraud:<Fraud/>, ai:<AskAstro/>, analytics:<Analytics/>, settings:<Settings user={user}/> };
+  const pages = {
+    home: <Home user={user} updates={updates} />,
+    astrofin: <AstroFin updates={updates} />,
+    creditai: <CreditScore user={user} />,
+    loan: <Loan />,
+    fraud: <Fraud />,
+    ai: <AskAstro updates={updates} />,
+    analytics: <Analytics updates={updates} />,
+    settings: <Settings user={user} />,
+  };
 
   return (
     <div style={{ display:"flex", height:"100vh", position:"fixed", inset:0 }}>
