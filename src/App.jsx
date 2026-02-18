@@ -770,7 +770,7 @@ function Home({ user, updates }) {
 
       <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
         <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(226,234,255,0.4)" }}>Latest Finance Updates</div>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:14 }}>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:18, position:"relative", zIndex:3 }}>
           {latestFinance.map((item, i) => (
             <HexNews key={`${item.title}-${i}`} title={item.title} cat={item.cat} time={item.time} sentiment={item.sentiment} delay={i * 0.08} />
           ))}
@@ -839,7 +839,7 @@ function AstroFin({ updates }) {
       </div>
       <div style={{ marginTop:22 }}>
         <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(52,211,153,0.65)", marginBottom:12 }}>Twin Context Feed</div>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:12 }}>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:18, position:"relative", zIndex:3 }}>
           {latestFinance.map((item, i) => (
             <HexNews key={`astro-${item.title}-${i}`} title={item.title} cat={item.cat} time={item.time} sentiment={item.sentiment} delay={i * 0.08} />
           ))}
@@ -1192,20 +1192,25 @@ function HexNews({ title, cat, time, sentiment, delay }) {
   const borderColor = sentiment === "bullish" ? "#34d399" : sentiment === "bearish" ? "#f87171" : "#63b3ff";
   return (
     <div style={{
-      position:"relative", width:220, minHeight:132,
+      position:"relative", width:280, minHeight:178,
       clipPath:"polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)",
-      background:"rgba(255,255,255,0.03)",
-      border:`1px solid ${borderColor}30`,
-      padding:"20px 24px", display:"flex", flexDirection:"column", justifyContent:"center",
+      background:"rgba(255,255,255,0.045)",
+      border:`1px solid ${borderColor}45`,
+      padding:"26px 34px", display:"flex", flexDirection:"column", justifyContent:"center",
       animation:`fadeUp 0.4s ease ${delay}s both`,
       transition:"all 0.2s",
+      boxShadow:`0 0 22px ${borderColor}22`,
     }}
       onMouseEnter={e => { e.currentTarget.style.background = `${borderColor}10`; e.currentTarget.style.borderColor = `${borderColor}60`; }}
       onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = `${borderColor}30`; }}
     >
-      <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.1em", color:`${borderColor}`, marginBottom:6, fontWeight:700 }}>{cat}</div>
-      <div style={{ fontSize:17, lineHeight:1.45, marginBottom:7, fontWeight:700 }}>{title}</div>
-      <div style={{ fontSize:12, color:"rgba(226,234,255,0.48)", fontFamily:"'JetBrains Mono', monospace" }}>{time}</div>
+      <div style={{ fontSize:13, textTransform:"uppercase", letterSpacing:"0.14em", color:`${borderColor}`, marginBottom:10, fontWeight:800 }}>{cat}</div>
+      <div style={{
+        fontSize:21, lineHeight:1.42, marginBottom:10, fontWeight:800, color:"#eef6ff",
+        textShadow:"0 0 10px rgba(0,0,0,0.35)",
+        display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden",
+      }}>{title}</div>
+      <div style={{ fontSize:13, color:"rgba(226,234,255,0.65)", fontFamily:"'JetBrains Mono', monospace", fontWeight:500 }}>{time}</div>
     </div>
   );
 }
