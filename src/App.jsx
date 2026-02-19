@@ -929,20 +929,23 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
               <button
                 onClick={handleIncomeEdit}
                 style={{
-                  padding:"4px 8px",
-                  background:"rgba(99,179,255,0.1)",
-                  border:"1px solid rgba(99,179,255,0.2)",
-                  borderRadius:6,
+                  padding:"6px 12px",
+                  background:"linear-gradient(135deg,rgba(99,179,255,0.15),rgba(99,179,255,0.08))",
+                  border:"1px solid rgba(99,179,255,0.4)",
+                  borderRadius:8,
                   color:"#63b3ff",
-                  fontSize:10,
-                  fontWeight:600,
+                  fontSize:11,
+                  fontWeight:700,
                   cursor:"pointer",
-                  transition:"all 0.2s"
+                  transition:"all 0.2s",
+                  boxShadow:"0 2px 8px rgba(99,179,255,0.2)",
+                  position:"relative",
+                  zIndex:10
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,179,255,0.15)"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.3)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "rgba(99,179,255,0.1)"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.2)"; }}
+                onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(99,179,255,0.25),rgba(99,179,255,0.15))"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.6)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(99,179,255,0.15),rgba(99,179,255,0.08))"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.4)"; e.currentTarget.style.transform = "translateY(0)"; }}
               >
-                Edit Income
+                ✏️ Edit Income
               </button>
             </div>
             {isEditingIncome ? (
@@ -997,8 +1000,31 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
                 </div>
               </div>
             ) : (
-              <div className="balance-num" style={{ fontSize:44, fontWeight:800, fontFamily:"'JetBrains Mono', monospace", background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
-                ₹{user.balance.toLocaleString("en-IN")}
+              <div style={{ position:"relative" }}>
+                <div className="balance-num" style={{ fontSize:44, fontWeight:800, fontFamily:"'JetBrains Mono', monospace", background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+                  ₹{user.balance.toLocaleString("en-IN")}
+                </div>
+                <button
+                  onClick={handleIncomeEdit}
+                  style={{
+                    position:"absolute",
+                    bottom: "-8px",
+                    right: "0px",
+                    padding:"4px 10px",
+                    background:"rgba(99,179,255,0.12)",
+                    border:"1px solid rgba(99,179,255,0.3)",
+                    borderRadius:6,
+                    color:"#63b3ff",
+                    fontSize:10,
+                    fontWeight:600,
+                    cursor:"pointer",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,179,255,0.2)"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(99,179,255,0.12)"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.3)"; }}
+                >
+                  Edit Income
+                </button>
               </div>
             )}
           </div>
