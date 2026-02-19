@@ -90,15 +90,27 @@ export default async function handler(req, res) {
     const user = requireAuth(req, res, ["banker"]);
     if (!user) return;
 
-    const customer = {
+    const defaults = {
       customerId: "CUST-7721",
-      name: "Priya Mehta",
+      name: "Arjun Sharma",
       phone: "9876543210",
       income: 92000,
       spending: 51000,
       loans: 24000,
       creditScore: 734,
       riskLevel: "medium",
+    };
+    const qp = url.searchParams;
+    const customer = {
+      ...defaults,
+      ...(qp.get("customerId") ? { customerId: qp.get("customerId") } : {}),
+      ...(qp.get("name") ? { name: qp.get("name") } : {}),
+      ...(qp.get("phone") ? { phone: qp.get("phone") } : {}),
+      ...(qp.get("income") ? { income: Number(qp.get("income")) || defaults.income } : {}),
+      ...(qp.get("spending") ? { spending: Number(qp.get("spending")) || defaults.spending } : {}),
+      ...(qp.get("loans") ? { loans: Number(qp.get("loans")) || defaults.loans } : {}),
+      ...(qp.get("creditScore") ? { creditScore: Number(qp.get("creditScore")) || defaults.creditScore } : {}),
+      ...(qp.get("riskLevel") ? { riskLevel: qp.get("riskLevel") } : {}),
     };
 
     const profile = buildCustomerProfile(customer);

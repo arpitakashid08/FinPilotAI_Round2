@@ -192,10 +192,23 @@ const api = {
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify(profile),
     }, fallbackCrossSell),
-  rmCustomerSummary: async ({ bankerToken }) =>
-    callApi("/rm/customer-summary", {
+  rmCustomerSummary: async ({ bankerToken, customer } = {}) => {
+    const qs = customer
+      ? `?${new URLSearchParams({
+          customerId: `${customer.customerId || ""}`,
+          name: `${customer.name || ""}`,
+          phone: `${customer.phone || ""}`,
+          income: `${customer.income ?? ""}`,
+          spending: `${customer.spending ?? ""}`,
+          loans: `${customer.loans ?? ""}`,
+          creditScore: `${customer.creditScore ?? ""}`,
+          riskLevel: `${customer.riskLevel || ""}`,
+        }).toString()}`
+      : "";
+    return callApi(`/rm/customer-summary${qs}`, {
       headers: bankerToken ? { Authorization: `Bearer ${bankerToken}` } : {},
-    }, fallbackRmSummary),
+    }, fallbackRmSummary);
+  },
   rmProductDecision: async ({ bankerToken, payload }) =>
     callApi("/rm/product-decision", {
       method: "POST",
@@ -937,8 +950,23 @@ function Home({ user, updates }) {
 }
 
 // ── ASTROFIN PAGE ─────────────────────────────────────────────
-function AstroFin({ updates }) {
+function AstroFin({ updates, customerProfile }) {
   const latestFinance = updates?.latestFinance || [];
+  const [spentToday, setSpentToday] = useState(1200);
+  const [spentMonth, setSpentMonth] = useState(18000);
+  const [monthBudget, setMonthBudget] = useState(() => Math.max(5000, Math.round((customerProfile?.income || twin.income) * 0.6)));
+
+  useEffect(() => {
+    setMonthBudget((b) => {
+      const next = Math.max(5000, Math.round((customerProfile?.income || twin.income) * 0.6));
+      return b ? b : next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerProfile?.income]);
+
+  const left = Math.round(monthBudget - spentMonth);
+  const leftPct = Math.max(0, Math.min(1, monthBudget ? left / monthBudget : 0));
+  const warn = left <= 0 || leftPct < 0.2;
   return (
     <div style={{ animation:"fadeIn 0.4s ease" }}>
       <div style={{ marginBottom:32 }}>
@@ -972,6 +1000,64 @@ function AstroFin({ updates }) {
             <div style={{ fontSize:12, color:"rgba(226,234,255,0.5)", lineHeight:1.8 }}>
               Twin projects <span style={{ color:"#34d399", fontWeight:700 }}>36.5% savings rate</span>. Debt service at <span style={{ color:"#fbbf24", fontWeight:700 }}>14.1%</span>. Modeled net worth: <span style={{ color:"#a78bfa", fontWeight:700 }}>+12.4% YoY</span>.
             </div>
+          </div>
+
+          <div style={{
+            marginTop:14,
+            clipPath:"polygon(6% 0, 94% 0, 100% 18%, 100% 82%, 94% 100%, 6% 100%, 0 82%, 0 18%)",
+            border:`1px solid ${warn ? "rgba(248,113,113,0.35)" : "rgba(99,179,255,0.25)"}`,
+            background: warn ? "rgba(248,113,113,0.07)" : "rgba(99,179,255,0.06)",
+            padding:"16px 18px",
+            display:"flex",
+            flexDirection:"column",
+            gap:10,
+          }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:12 }}>
+              <div style={{ fontSize:12, fontWeight:900, letterSpacing:"0.12em", textTransform:"uppercase", color: warn ? "rgba(248,113,113,0.95)" : "rgba(99,179,255,0.9)" }}>
+                Spend Tracker (interactive)
+              </div>
+              <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:12, color: warn ? "#f87171" : "#63b3ff", fontWeight:800 }}>
+                Left ₹{Math.max(0, left).toLocaleString("en-IN")}
+              </div>
+            </div>
+
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:10 }}>
+              <label style={{ fontSize:12, color:"rgba(226,234,255,0.75)" }}>
+                Spent today
+                <input type="number" value={spentToday} min={0} onChange={e=>setSpentToday(Number(e.target.value) || 0)}
+                  className="glass-input"
+                  style={{ width:"100%", marginTop:6, background:"rgba(3,7,18,0.7)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.14)", borderRadius:10, padding:"10px 12px" }}
+                />
+              </label>
+              <label style={{ fontSize:12, color:"rgba(226,234,255,0.75)" }}>
+                Spent this month
+                <input type="number" value={spentMonth} min={0} onChange={e=>setSpentMonth(Number(e.target.value) || 0)}
+                  className="glass-input"
+                  style={{ width:"100%", marginTop:6, background:"rgba(3,7,18,0.7)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.14)", borderRadius:10, padding:"10px 12px" }}
+                />
+              </label>
+              <label style={{ fontSize:12, color:"rgba(226,234,255,0.75)" }}>
+                Monthly budget
+                <input type="number" value={monthBudget} min={0} onChange={e=>setMonthBudget(Number(e.target.value) || 0)}
+                  className="glass-input"
+                  style={{ width:"100%", marginTop:6, background:"rgba(3,7,18,0.7)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.14)", borderRadius:10, padding:"10px 12px" }}
+                />
+              </label>
+            </div>
+
+            <div style={{ height:3, background:"rgba(255,255,255,0.06)", borderRadius:999 }}>
+              <div style={{ height:"100%", width:`${leftPct * 100}%`, borderRadius:999, background: warn ? "linear-gradient(90deg,#f87171,#fbbf24)" : "linear-gradient(90deg,#63b3ff,#34d399)", transition:"width 0.35s ease" }} />
+            </div>
+
+            {warn ? (
+              <div style={{ fontSize:12, lineHeight:1.6, color:"rgba(226,234,255,0.78)" }}>
+                <span style={{ color:"#f87171", fontWeight:900 }}>Warning:</span> You’re running low on this month’s budget. Consider pausing discretionary spends and reviewing subscriptions.
+              </div>
+            ) : (
+              <div style={{ fontSize:12, lineHeight:1.6, color:"rgba(226,234,255,0.78)" }}>
+                Trend: today ₹{spentToday.toLocaleString("en-IN")} • month ₹{spentMonth.toLocaleString("en-IN")} • pacing looks healthy.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1254,31 +1340,42 @@ function Analytics({ updates }) {
 
 function FeatureShard({ title, items, color, delay = 0 }) {
   return (
-    <div style={{
-      clipPath:"polygon(8% 0, 100% 0, 92% 100%, 0 100%)",
-      background:`linear-gradient(135deg, ${color}10, rgba(255,255,255,0.02))`,
-      border:`1px solid ${color}40`,
-      padding:"18px 22px",
-      animation:`fadeUp 0.35s ease ${delay}s both`,
-    }}>
-      <div style={{ fontSize:12, fontWeight:800, letterSpacing:"0.12em", textTransform:"uppercase", color, marginBottom:10 }}>{title}</div>
-      <div style={{ display:"flex", flexDirection:"column", gap:9 }}>
-        {items.map((it, idx) => (
-          <div key={idx} style={{ display:"flex", alignItems:"flex-start", gap:10, color:"rgba(226,234,255,0.82)", lineHeight:1.6, fontSize:13 }}>
-            <span style={{ marginTop:6, width:6, height:6, borderRadius:"50%", background:color, boxShadow:`0 0 7px ${color}`, flexShrink:0 }} />
-            <span>{it}</span>
-          </div>
-        ))}
+    <div style={{ position:"relative", animation:`fadeUp 0.35s ease ${delay}s both` }}>
+      <div aria-hidden style={{
+        position:"absolute", inset:0,
+        clipPath:"polygon(4% 0, 96% 0, 100% 12%, 100% 88%, 96% 100%, 4% 100%, 0 88%, 0 12%)",
+        background:`linear-gradient(135deg, ${color}12, rgba(255,255,255,0.02))`,
+        border:`1px solid ${color}45`,
+        boxShadow:`0 0 18px ${color}15`,
+        pointerEvents:"none",
+      }} />
+      <div style={{
+        position:"relative",
+        padding:"20px 26px",
+        paddingLeft:30,
+        overflow:"visible",
+      }}>
+        <div style={{ fontSize:12, fontWeight:800, letterSpacing:"0.12em", textTransform:"uppercase", color, marginBottom:12, lineHeight:1.2 }}>
+          {title}
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:9 }}>
+          {items.map((it, idx) => (
+            <div key={idx} style={{ display:"flex", alignItems:"flex-start", gap:10, color:"rgba(226,234,255,0.82)", lineHeight:1.6, fontSize:13 }}>
+              <span style={{ marginTop:6, width:6, height:6, borderRadius:"50%", background:color, boxShadow:`0 0 7px ${color}`, flexShrink:0 }} />
+              <span style={{ paddingRight:6 }}>{it}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function SmartCrossSell({ token }) {
-  const [profile, setProfile] = useState({ income: 90000, spending: 52000, loans: 25000, creditScore: 732, riskLevel: "medium" });
+function SmartCrossSell({ token, customerProfile, setCustomerProfile }) {
   const [result, setResult] = useState(fallbackCrossSell);
   const [loading, setLoading] = useState(false);
-  const update = (k, v) => setProfile((p) => ({ ...p, [k]: v }));
+  const profile = customerProfile;
+  const update = (k, v) => setCustomerProfile((p) => ({ ...p, [k]: v }));
   const run = async () => {
     setLoading(true);
     const data = await api.crossSellRecommend({ profile, token });
@@ -1321,7 +1418,7 @@ function SmartCrossSell({ token }) {
   );
 }
 
-function BankerRMCopilot({ token, bankerToken, setBankerToken }) {
+function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, setCustomerProfile }) {
   const [summary, setSummary] = useState(null);
   const [decision, setDecision] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState("Secured Credit Card");
@@ -1330,7 +1427,7 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken }) {
 
   const loadSummary = async () => {
     if (!bankerToken) return;
-    const res = await api.rmCustomerSummary({ bankerToken: activeToken });
+    const res = await api.rmCustomerSummary({ bankerToken: activeToken, customer: customerProfile });
     if (res.message) setErr(res.message);
     else { setErr(""); setSummary(res); }
   };
@@ -1349,6 +1446,21 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken }) {
     if (bankerToken) loadSummary();
   }, [bankerToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!bankerToken) return;
+    const t = setTimeout(() => loadSummary(), 180);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    bankerToken,
+    customerProfile?.name,
+    customerProfile?.income,
+    customerProfile?.spending,
+    customerProfile?.loans,
+    customerProfile?.creditScore,
+    customerProfile?.riskLevel,
+  ]);
+
   return (
     <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:18 }}>
       <div style={{ fontSize:30, fontWeight:800 }}>⌁ <span style={{ background:"linear-gradient(135deg,#63b3ff,#34d399)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Banker / RM Co-Pilot</span></div>
@@ -1358,6 +1470,42 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken }) {
       </div>
       {!bankerToken && <div style={{ color:"rgba(226,234,255,0.7)", fontSize:12 }}>Enable banker role to access RM-protected APIs.</div>}
       {!!err && <div style={{ color:"#f87171", fontSize:12 }}>{err}</div>}
+      <div style={{
+        clipPath:"polygon(4% 0, 96% 0, 100% 12%, 100% 88%, 96% 100%, 4% 100%, 0 88%, 0 12%)",
+        border:"1px solid rgba(99,179,255,0.25)",
+        background:"rgba(99,179,255,0.06)",
+        padding:"16px 18px",
+        display:"grid",
+        gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",
+        gap:12,
+      }}>
+        <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(99,179,255,0.85)", fontWeight:800, gridColumn:"1 / -1" }}>
+          Live Customer Inputs (shared with Cross‑Sell)
+        </div>
+        <label style={{ fontSize:12 }}>Name
+          <input value={customerProfile.name} onChange={e=>setCustomerProfile(p=>({...p, name:e.target.value}))} className="glass-input" style={{ width:"100%", marginTop:6, background:"rgba(3,7,18,0.7)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.14)", borderRadius:10, padding:"10px 12px" }} />
+        </label>
+        <label style={{ fontSize:12 }}>Income ₹{customerProfile.income.toLocaleString("en-IN")}
+          <input type="range" min={25000} max={220000} step={1000} value={customerProfile.income} onChange={e=>setCustomerProfile(p=>({...p, income:Number(e.target.value)}))} style={{ width:"100%" }} />
+        </label>
+        <label style={{ fontSize:12 }}>Spending ₹{customerProfile.spending.toLocaleString("en-IN")}
+          <input type="range" min={8000} max={160000} step={1000} value={customerProfile.spending} onChange={e=>setCustomerProfile(p=>({...p, spending:Number(e.target.value)}))} style={{ width:"100%" }} />
+        </label>
+        <label style={{ fontSize:12 }}>Loans ₹{customerProfile.loans.toLocaleString("en-IN")}
+          <input type="range" min={0} max={120000} step={1000} value={customerProfile.loans} onChange={e=>setCustomerProfile(p=>({...p, loans:Number(e.target.value)}))} style={{ width:"100%" }} />
+        </label>
+        <label style={{ fontSize:12 }}>Credit {customerProfile.creditScore}
+          <input type="range" min={500} max={900} step={1} value={customerProfile.creditScore} onChange={e=>setCustomerProfile(p=>({...p, creditScore:Number(e.target.value)}))} style={{ width:"100%" }} />
+        </label>
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          <div style={{ fontSize:12 }}>Risk Level</div>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+            {["low","medium","high"].map((r)=>(
+              <button key={r} onClick={()=>setCustomerProfile(p=>({...p, riskLevel:r}))} style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:`1px solid ${customerProfile.riskLevel===r?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.2)"}`, color:customerProfile.riskLevel===r?"#34d399":"rgba(226,234,255,0.7)", padding:"7px 10px", fontSize:11 }}>{r}</button>
+            ))}
+          </div>
+        </div>
+      </div>
       {summary?.customer && (
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }} className="sphere-row">
           <FeatureShard title="Customer Snapshot" color="#63b3ff" items={Object.entries(summary.customer).map(([k,v]) => `${k}: ${v}`)} />
@@ -1406,12 +1554,12 @@ function PrivacyCompliance({ token, bankerToken }) {
   );
 }
 
-function CrossSellEngine({ token }) {
-  return <SmartCrossSell token={token} />;
+function CrossSellEngine({ token, customerProfile, setCustomerProfile }) {
+  return <SmartCrossSell token={token} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />;
 }
 
-function RMCopilot({ token, bankerToken, setBankerToken }) {
-  return <BankerRMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} />;
+function RMCopilot({ token, bankerToken, setBankerToken, customerProfile, setCustomerProfile }) {
+  return <BankerRMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />;
 }
 
 function ComplianceLayer({ token, bankerToken }) {
@@ -1609,25 +1757,48 @@ function DoYouKnowButton({ question, answer }) {
 }
 
 // Investor Profile card
-function InvestorProfile({ name, title, quote, achievement, delay }) {
+function InvestorProfile({ name, title, quote, achievement, company, skills = [], experience, photoUrl, delay }) {
   return (
     <div style={{
       background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.06)",
       borderRadius:16, padding:"20px 24px", animation:`fadeUp 0.5s ease ${delay || 0}s both`,
     }}>
       <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:14 }}>
-        <div style={{
-          width:56, height:56, borderRadius:"50%",
-          background:"linear-gradient(135deg, #1a3a8e, #2d1a8e)",
-          display:"flex", alignItems:"center", justifyContent:"center",
-          fontSize:24, fontWeight:800, flexShrink:0,
-          boxShadow:"0 0 20px rgba(99,179,255,0.25)",
-        }}>
-          <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{name[0]}</span>
-        </div>
+        {photoUrl ? (
+          <img
+            src={photoUrl}
+            alt={name}
+            width={56}
+            height={56}
+            style={{
+              width:56, height:56, borderRadius:"50%",
+              objectFit:"cover",
+              border:"1px solid rgba(255,255,255,0.12)",
+              boxShadow:"0 0 20px rgba(99,179,255,0.18)",
+              flexShrink:0,
+            }}
+          />
+        ) : (
+          <div style={{
+            width:56, height:56, borderRadius:"50%",
+            background:"linear-gradient(135deg, #1a3a8e, #2d1a8e)",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            fontSize:24, fontWeight:800, flexShrink:0,
+            boxShadow:"0 0 20px rgba(99,179,255,0.25)",
+          }}>
+            <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{name[0]}</span>
+          </div>
+        )}
         <div>
           <div style={{ fontSize:15, fontWeight:700 }}>{name}</div>
-          <div style={{ fontSize:11, color:"rgba(226,234,255,0.4)", marginTop:2 }}>{title}</div>
+          <div style={{ fontSize:11, color:"rgba(226,234,255,0.4)", marginTop:2 }}>
+            {title}{company ? ` • ${company}` : ""}
+          </div>
+          {!!experience && (
+            <div style={{ fontSize:10, color:"rgba(226,234,255,0.32)", marginTop:4, fontFamily:"'JetBrains Mono', monospace" }}>
+              {experience}
+            </div>
+          )}
         </div>
       </div>
       <div style={{
@@ -1637,12 +1808,111 @@ function InvestorProfile({ name, title, quote, achievement, delay }) {
       }}>
         "{quote}"
       </div>
+      {skills?.length > 0 && (
+        <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:12 }}>
+          {skills.slice(0, 5).map((s) => (
+            <div key={s} style={{
+              clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)",
+              border:"1px solid rgba(99,179,255,0.2)",
+              background:"rgba(99,179,255,0.06)",
+              padding:"6px 10px",
+              fontSize:10,
+              color:"rgba(226,234,255,0.7)",
+              fontFamily:"'JetBrains Mono', monospace",
+            }}>{s}</div>
+          ))}
+        </div>
+      )}
       <div style={{
         fontSize:11, color:"rgba(99,179,255,0.7)", padding:"8px 12px",
         background:"rgba(99,179,255,0.05)", borderRadius:10,
         border:"1px solid rgba(99,179,255,0.12)",
       }}>
         💡 {achievement}
+      </div>
+    </div>
+  );
+}
+
+const INVESTORS = [
+  {
+    name: "Ashneer Grover",
+    company: "BharatPe",
+    title: "Fintech Entrepreneur & Angel Investor",
+    experience: "10+ yrs in consumer fintech",
+    skills: ["Fintech GTM", "Unit economics", "Payments", "Product growth", "Risk"],
+    quote: "Distribution + underwriting discipline wins in retail finance.",
+    achievement: "Scaled high-velocity fintech with focus on CAC payback and fraud controls.",
+  },
+  {
+    name: "Anupam Mittal",
+    company: "Shaadi.com",
+    title: "Founder & Investor",
+    experience: "20+ yrs consumer internet",
+    skills: ["Brand", "Consumer product", "Pricing", "Growth loops", "Hiring"],
+    quote: "Build a product people love, then scale the system behind it.",
+    achievement: "Helped multiple startups sharpen positioning and retention-led growth.",
+  },
+  {
+    name: "Namita Thapar",
+    company: "Emcure Pharmaceuticals",
+    title: "Executive Director & Investor",
+    experience: "15+ yrs operations & scaling",
+    skills: ["Operations", "Compliance", "Go-to-market", "Leadership", "Execution"],
+    quote: "Great businesses execute relentlessly—especially on compliance and trust.",
+    achievement: "Strong focus on governance, process, and sustainable growth.",
+  },
+  {
+    name: "Falguni Nayar",
+    company: "Nykaa",
+    title: "Founder & Investor",
+    experience: "25+ yrs finance & consumer",
+    skills: ["Retail fintech", "Trust", "Customer experience", "Marketplace ops", "Capital strategy"],
+    quote: "Trust compounds. Build it into every customer interaction.",
+    achievement: "Built a category leader with high repeat usage and strong unit economics.",
+  },
+  {
+    name: "Kiran Mazumdar-Shaw",
+    company: "Biocon",
+    title: "Founder & Investor",
+    experience: "30+ yrs enterprise building",
+    skills: ["Long-term strategy", "Governance", "R&D discipline", "Scaling", "Resilience"],
+    quote: "Strong governance and long-term thinking are competitive advantages.",
+    achievement: "Proven playbook for building durable, regulation-friendly companies.",
+  },
+  {
+    name: "Nithin Kamath",
+    company: "Zerodha",
+    title: "Founder & Investor",
+    experience: "15+ yrs brokerage & investing",
+    skills: ["Investing", "Risk", "Customer support", "Operational efficiency", "Simplicity"],
+    quote: "Simple products + transparent pricing earn long-term loyalty.",
+    achievement: "Scaled a lean, profitable financial services business with trust-first product design.",
+  },
+];
+
+function avatarUrl(name) {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D1F6E&color=E2EAFF&size=128&bold=true`;
+}
+
+function pickInvestors(seed = "") {
+  const s = `${seed}`;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const a = h % INVESTORS.length;
+  const b = (a + 2 + (h % 3)) % INVESTORS.length;
+  return [INVESTORS[a], INVESTORS[b]];
+}
+
+function InvestorsShowcase({ featureId, title = "Investor Lens" }) {
+  const picks = pickInvestors(featureId).map((p) => ({ ...p, photoUrl: avatarUrl(p.name) }));
+  return (
+    <div style={{ marginTop:18, display:"flex", flexDirection:"column", gap:10 }}>
+      <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(167,139,250,0.75)" }}>{title}</div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))", gap:12 }}>
+        {picks.map((inv, i) => (
+          <InvestorProfile key={`${featureId}-${inv.name}`} {...inv} delay={i * 0.08} />
+        ))}
       </div>
     </div>
   );
@@ -1846,6 +2116,16 @@ function Shell({ token, initialBankerToken = "" }) {
   const [user, setUser] = useState(null);
   const [updates, setUpdates] = useState(fallbackUpdates);
   const [bankerToken, setBankerToken] = useState(initialBankerToken);
+  const [customerProfile, setCustomerProfile] = useState({
+    customerId: "CUST-7721",
+    name: "Arjun Sharma",
+    phone: "9876543210",
+    income: 92000,
+    spending: 51000,
+    loans: 24000,
+    creditScore: 734,
+    riskLevel: "medium",
+  });
   const [loading, setL] = useState(true);
   const [active, setA]  = useState("home");
   const [col, setCol]   = useState(false);
@@ -1872,10 +2152,10 @@ function Shell({ token, initialBankerToken = "" }) {
 
   const pages = {
     home: <Home user={user} updates={updates} />,
-    astrofin: <AstroFin updates={updates} />,
+    astrofin: <AstroFin updates={updates} customerProfile={customerProfile} />,
     creditai: <CreditScore user={user} />,
-    crosssell: <CrossSellEngine token={token} />,
-    rmcopilot: <RMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} />,
+    crosssell: <CrossSellEngine token={token} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />,
+    rmcopilot: <RMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />,
     compliance: <ComplianceLayer token={token} bankerToken={bankerToken} />,
     loan: <Loan />,
     fraud: <Fraud />,
@@ -1895,6 +2175,7 @@ function Shell({ token, initialBankerToken = "" }) {
         <TopBar active={active} user={user} />
         <div className="page-content" style={{ flex:1, overflowY:"auto", padding: mobile ? "16px 16px 90px" : "32px 40px" }}>
           {pages[active]}
+          <InvestorsShowcase featureId={active} title="Investors & Mentors" />
         </div>
       </div>
       {/* Mobile bottom nav */}
