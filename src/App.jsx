@@ -33,12 +33,16 @@ const fallbackFeatureModules = {
       "Ranks recommendations by trust, eligibility, and lifecycle stage.",
       "Suppresses noisy offers using fatigue and consent-aware controls.",
     ],
-    aiMlUsed: [
-      "Recommendation systems (hybrid collaborative + rule-guided)",
-      "Customer clustering and propensity modeling",
-      "Contextual bandits for next-best-offer timing",
+    liveSignals: [
+      "Offer-fit score by customer intent",
+      "Eligibility confidence and trust score",
+      "Channel timing signal (app / RM / assisted)",
     ],
-    techStack: ["Python", "FastAPI", "Feature Store", "Kafka stream triggers", "React in-app widgets"],
+    operatorControls: [
+      "Allow / suppress offers by policy and consent",
+      "Cap message frequency to avoid spam",
+      "Approve campaign bundles per segment",
+    ],
     appFunctions: [
       "Embedded offer rail inside dashboard and RM screens",
       "Explain-why tooltip for each recommendation",
@@ -54,12 +58,16 @@ const fallbackFeatureModules = {
       "Builds meeting briefs from transaction and profile context.",
       "Generates compliant response drafts for customer queries.",
     ],
-    aiMlUsed: [
-      "Decision intelligence with risk scoring",
-      "Retrieval-augmented generation on policy/product docs",
-      "Conversation summarization and intent extraction",
+    liveSignals: [
+      "Meeting urgency and follow-up score",
+      "Portfolio risk heat for each relationship",
+      "Product suitability confidence",
     ],
-    techStack: ["Python", "LLM APIs", "RBAC admin panel", "Audit logs", "CRM connector"],
+    operatorControls: [
+      "Generate call brief before outreach",
+      "Approve recommendation before customer share",
+      "Push post-call tasks to RM workflow",
+    ],
     appFunctions: [
       "RM cockpit timeline with AI recommendations",
       "Pre-call prep cards and objection handling prompts",
@@ -75,12 +83,16 @@ const fallbackFeatureModules = {
       "Logs model decisions for explainability and review.",
       "Monitors policy violations and escalates alerts automatically.",
     ],
-    aiMlUsed: [
-      "Explainable AI traces (reason codes + feature attribution)",
-      "Anomaly detection on access patterns",
-      "Policy-rule + ML hybrid compliance checks",
+    liveSignals: [
+      "Consent coverage and policy exceptions",
+      "Sensitive-data access anomaly alerts",
+      "Audit readiness and unresolved control gaps",
     ],
-    techStack: ["AES-256 encryption", "RBAC", "Private cloud", "Tokenization", "Immutable audit trail"],
+    operatorControls: [
+      "Block unsafe actions in real time",
+      "Export regulator-ready audit packet",
+      "Escalate critical violations to compliance queue",
+    ],
     appFunctions: [
       "Compliance pulse monitor inside operations dashboard",
       "One-click audit evidence export",
@@ -1216,8 +1228,8 @@ function ModuleRail({ module, icon, accent }) {
 
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16 }}>
         <FeatureShard title="What It Does" items={module.whatItDoes} color={accent} delay={0} />
-        <FeatureShard title="AI / ML Used" items={module.aiMlUsed} color="#63b3ff" delay={0.06} />
-        <FeatureShard title="Tech Stack" items={module.techStack} color="#34d399" delay={0.12} />
+        <FeatureShard title="Live Signals" items={module.liveSignals || []} color="#63b3ff" delay={0.06} />
+        <FeatureShard title="Operator Controls" items={module.operatorControls || []} color="#34d399" delay={0.12} />
       </div>
 
       <div style={{ display:"grid", gridTemplateColumns:"1.1fr 0.9fr", gap:16 }} className="sphere-row">
@@ -1246,7 +1258,7 @@ function ModuleRail({ module, icon, accent }) {
           display:"flex", flexDirection:"column", gap:12,
         }}>
           <div style={{ fontSize:12, letterSpacing:"0.11em", textTransform:"uppercase", color:"#63b3ff", fontWeight:800 }}>Execution Flow</div>
-          {["Sense customer state", "Score recommendations/risk", "Explain and action in UI"].map((step, idx) => (
+          {["Capture customer context", "Generate actionable guidance", "Execute in workflow with controls"].map((step, idx) => (
             <div key={idx} style={{
               clipPath:"polygon(10% 0, 100% 0, 90% 100%, 0 100%)",
               background:"rgba(99,179,255,0.08)",
