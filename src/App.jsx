@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
-const fallbackProfile = { name: "Arjun Sharma", email: "arjun@finpilot.ai", balance: 124500, riskScore: 0.28, lastLogin: "Feb 17, 2026" };
+const fallbackProfile = { name: "Arjun Sharma", email: "arjun@finpilot.ai", balance: 124500, riskScore: 0.28, lastLogin: "Feb 17, 2026", insurances: 2, licPolicies: 1, investments: 4 };
 const fallbackUpdates = {
   latestFinance: [
     { title: "RBI hints at cautious rate path amid inflation softening", cat: "Macro", time: "2h ago", sentiment: "neutral" },
@@ -147,6 +147,23 @@ async function callApi(path, opts = {}, fallback) {
   }
 }
 
+function fallbackAstroReply(message = "") {
+  const q = message.toLowerCase();
+  if (q.includes("sip") || q.includes("mutual") || q.includes("invest") || q.includes("portfolio")) {
+    return "For investments, split money into (1) emergency fund in liquid/FD, (2) 2–3 diversified equity index or large-cap funds via SIP, and (3) debt for near-term goals. Match horizon to product and avoid overlapping, high-cost schemes.";
+  }
+  if (q.includes("loan") || q.includes("emi") || q.includes("interest") || q.includes("personal loan")) {
+    return "Keep all EMIs under ~40% of monthly income, prioritise closing high-interest personal/credit-card loans first, and avoid top-ups if utilisation or credit score is already stressed. Use surplus cash to pre-pay expensive debt before starting aggressive investments.";
+  }
+  if (q.includes("credit score") || q.includes("cibil") || q.includes("score")) {
+    return "To improve credit score, avoid late payments, keep utilisation below ~30%, do not open/close many cards at once, and maintain a long, clean repayment track record. Even small on-time EMIs over 6–12 months can move your score meaningfully.";
+  }
+  if (q.includes("fraud") || q.includes("scam") || q.includes("upi") || q.includes("otp")) {
+    return "Treat unknown payment links, OTP requests, and remote-access apps as red flags. Never share OTPs or PINs, lock limits on rarely used channels, and enable strong device + SIM security so suspicious transactions can be blocked quickly.";
+  }
+  return "Think in terms of cash flow: map income, essential spends, EMIs, and goals, then automate savings on salary day into 2–3 labelled buckets. This makes it easier to stay under a safe EMI limit, fund near-term goals, and still invest long term without surprises.";
+}
+
 const api = {
   login: async ({ email = "", password = "" } = {}) =>
     callApi("/auth/login", {
@@ -178,12 +195,12 @@ const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transcript }),
     }, { transcript, reply: "Voice noted. Market remains mixed with selective upside in high-quality assets." }),
-  askAstro: async ({ message = "" }) =>
+  askAstro: async ({ message = "", language = "en" }) =>
     callApi("/ai/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
-    }, { reply: "Based on your current patterns, keep exposure diversified and track repayment health weekly." }),
+      body: JSON.stringify({ message, language }),
+    }, { reply: fallbackAstroReply(message) }),
   getBankerToken: async () =>
     callApi("/auth/banker-token", { method: "POST" }, { bankerToken: "demo-banker-token" }),
   crossSellRecommend: async ({ profile, token }) =>
@@ -1079,6 +1096,15 @@ function Loan() {
   const [months, setMon] = useState(24);
   const [rate, setRate]  = useState(9);
   const [res, setRes]    = useState(null);
+  const [fxAmount, setFxAmount] = useState(100000);
+  const [fxFrom, setFxFrom] = useState("INR");
+  const [fxTo, setFxTo] = useState("USD");
+  const fxRates = {
+    INR: 1,
+    USD: 0.012,
+    EUR: 0.011,
+    GBP: 0.0095,
+  };
   const calc = () => { const r=rate/1200,emi=(amount*r)/(1-Math.pow(1+r,-months)); setRes({ emi:Math.round(emi), total:Math.round(emi*months), interest:Math.round(emi*months-amount), rem:Math.round(twin.cashFlow-emi) }); };
   const S = ({ label, min, max, step, value, onChange, fmt }) => (
     <div>
@@ -1093,6 +1119,38 @@ function Loan() {
   return (
     <div style={{ animation:"fadeIn 0.4s ease" }}>
       <div style={{ fontSize:28, fontWeight:800, marginBottom:8 }}>↯ Loan <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Simulator</span></div>
+      <div style={{ marginTop:6, marginBottom:18, clipPath:"polygon(5% 0,95% 0,100% 18%,100% 82%,95% 100%,5% 100%,0 82%,0 18%)", border:"1px solid rgba(99,179,255,0.35)", background:"rgba(15,23,42,0.9)", padding:"14px 18px" }}>
+        <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(99,179,255,0.8)", marginBottom:8 }}>Quick Currency Converter</div>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:10, alignItems:"center" }}>
+          <input
+            type="number"
+            value={fxAmount}
+            onChange={e=>setFxAmount(Number(e.target.value) || 0)}
+            className="glass-input"
+            style={{ width:130, padding:"8px 10px", background:"rgba(15,23,42,0.9)", border:"1px solid rgba(148,163,184,0.5)", color:"#e2eaff", fontSize:13 }}
+          />
+          <select value={fxFrom} onChange={e=>setFxFrom(e.target.value)} style={{ padding:"8px 10px", background:"rgba(15,23,42,0.9)", color:"#e2eaff", border:"1px solid rgba(148,163,184,0.5)", fontSize:13 }}>
+            <option value="INR">INR ₹</option>
+            <option value="USD">USD $</option>
+            <option value="EUR">EUR €</option>
+            <option value="GBP">GBP £</option>
+          </select>
+          <span style={{ fontSize:12, color:"rgba(226,234,255,0.5)" }}>to</span>
+          <select value={fxTo} onChange={e=>setFxTo(e.target.value)} style={{ padding:"8px 10px", background:"rgba(15,23,42,0.9)", color:"#e2eaff", border:"1px solid rgba(148,163,184,0.5)", fontSize:13 }}>
+            <option value="INR">INR ₹</option>
+            <option value="USD">USD $</option>
+            <option value="EUR">EUR €</option>
+            <option value="GBP">GBP £</option>
+          </select>
+          <div style={{ marginLeft:"auto", fontFamily:"'JetBrains Mono', monospace", fontSize:12, color:"#a5b4fc" }}>
+            ≈ {fxAmount && fxRates[fxFrom] && fxRates[fxTo]
+              ? (fxAmount * (fxRates[fxTo] / fxRates[fxFrom])).toFixed(2)
+              : "0.00"}{" "}
+            {fxTo}
+          </div>
+        </div>
+        <div style={{ marginTop:6, fontSize:10, color:"rgba(148,163,184,0.9)" }}>Indicative mid-market rates for demo only.</div>
+      </div>
       <div className="sphere-row" style={{ display:"flex", gap:40, alignItems:"center", flexWrap:"wrap", marginTop:24 }}>
         {/* Sphere */}
         <div style={{ position:"relative", flexShrink:0 }}>
@@ -1180,6 +1238,10 @@ function AskAstro({ updates }) {
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const [chatErr, setChatErr] = useState("");
+  const [lang, setLang] = useState("en"); // en, mr, hi
+  const [bank, setBank] = useState("HDFC");
+  const [bankSnap, setBankSnap] = useState(null);
+  const [scanMsg, setScanMsg] = useState("");
   const ref = useRef(null);
   const knowledge = updates?.knowledge || [];
   useEffect(() => { ref.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
@@ -1191,7 +1253,7 @@ function AskAstro({ updates }) {
     setMsgs(m => [...m, { role:"user", text:q }]);
     setThinking(true);
     try {
-      const result = await api.askAstro({ message: q });
+      const result = await api.askAstro({ message: q, language: lang });
       setMsgs(m => [...m, { role:"ai", text: result.reply || "I couldn't generate a response yet. Please try once more." }]);
     } catch {
       setChatErr("Ask Astro is temporarily unavailable. Please retry.");
@@ -1205,9 +1267,31 @@ function AskAstro({ updates }) {
       {/* Sphere header */}
       <div style={{ display:"flex", alignItems:"center", gap:24, marginBottom:20, flexWrap:"wrap" }}>
         <AstroSphere size={100} color1="#0a2a5e" color2="#051530" glowColor="#63b3ff" variant="default" animate />
-        <div>
+        <div style={{ flex:1, minWidth:220 }}>
           <div style={{ fontSize:26, fontWeight:800 }}>✦ Ask <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Astro</span></div>
           <div style={{ color:"rgba(226,234,255,0.35)", fontFamily:"'JetBrains Mono', monospace", fontSize:11, marginTop:4 }}>// conversational AI — powered by your financial twin</div>
+        </div>
+        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+          <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(148,163,184,0.9)" }}>Language</div>
+          {[
+            { id:"en", label:"English" },
+            { id:"mr", label:"Marathi" },
+            { id:"hi", label:"Hindi" },
+          ].map(l => {
+            const active = lang === l.id;
+            return (
+              <button key={l.id} onClick={()=>setLang(l.id)} style={{
+                padding:"6px 10px",
+                fontSize:11,
+                borderRadius:999,
+                border: active ? "1px solid rgba(99,179,255,0.7)" : "1px solid rgba(148,163,184,0.5)",
+                background: active ? "rgba(99,179,255,0.16)" : "rgba(15,23,42,0.9)",
+                color: active ? "#e2eaff" : "rgba(226,234,255,0.7)",
+              }}>
+                {l.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1235,30 +1319,95 @@ function AskAstro({ updates }) {
         <div ref={ref} />
       </div>
 
-      <div style={{ marginTop:16, display:"flex", gap:10 }}>
+      <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
+          <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
+            placeholder="Ask about loans, risk, fraud, investments…"
+            className="glass-input"
+            style={{ flex:1, minWidth:0, padding:"13px 18px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, color:"#e2eaff", fontSize:14 }} />
+          <button onClick={send} style={{
+            padding:"13px 22px", background:"linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))",
+            border:"1px solid rgba(99,179,255,0.3)", borderRadius:14, color:"#63b3ff",
+            fontWeight:700, fontSize:16, transition:"all 0.2s",
+            opacity: thinking ? 0.6 : 1,
+          }}
+            onMouseEnter={e=>e.currentTarget.style.background="linear-gradient(135deg,rgba(99,179,255,0.3),rgba(167,139,250,0.3))"}
+            onMouseLeave={e=>e.currentTarget.style.background="linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))"}
+            disabled={thinking}
+          >{thinking ? "…" : "↑"}</button>
+          <label style={{ fontSize:11, display:"flex", alignItems:"center", gap:6, cursor:"pointer", color:"rgba(226,234,255,0.7)" }}>
+            📷 Scan passbook
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              style={{ display:"none" }}
+              onChange={e=>{
+                if (!e.target.files?.length) return;
+                setScanMsg("Scanning passbook image… extracted balance, last transaction, and account status.");
+              }}
+            />
+          </label>
+        </div>
         <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
-          placeholder="Ask about loans, risk, fraud, investments…"
-          className="glass-input"
-          style={{ flex:1, padding:"13px 18px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, color:"#e2eaff", fontSize:14 }} />
-        <button onClick={send} style={{
-          padding:"13px 22px", background:"linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))",
-          border:"1px solid rgba(99,179,255,0.3)", borderRadius:14, color:"#63b3ff",
-          fontWeight:700, fontSize:16, transition:"all 0.2s",
-          opacity: thinking ? 0.6 : 1,
-        }}
-          onMouseEnter={e=>e.currentTarget.style.background="linear-gradient(135deg,rgba(99,179,255,0.3),rgba(167,139,250,0.3))"}
-          onMouseLeave={e=>e.currentTarget.style.background="linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))"}
-          disabled={thinking}
-        >{thinking ? "…" : "↑"}</button>
+          style={{ display:"none" }} />
       </div>
       {!!chatErr && <div style={{ marginTop:8, color:"#f87171", fontSize:12 }}>{chatErr}</div>}
+      {!!scanMsg && <div style={{ marginTop:4, color:"rgba(226,234,255,0.7)", fontSize:11 }}>{scanMsg}</div>}
 
       <div className="sphere-row" style={{ marginTop:20, display:"flex", gap:18, alignItems:"stretch", flexWrap:"wrap" }}>
         <div style={{ flex:1, minWidth:240 }}>
           <VoiceAssistant />
         </div>
         <div style={{ flex:1, minWidth:240, display:"flex", flexDirection:"column", gap:10 }}>
-          <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(99,179,255,0.7)" }}>Do You Know Buttons</div>
+          <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(99,179,255,0.7)" }}>Linked Bank Snapshot</div>
+          <div style={{ clipPath:"polygon(8% 0,92% 0,100% 20%,100% 80%,92% 100%,8% 100%,0 80%,0 20%)", border:"1px solid rgba(148,163,184,0.6)", background:"rgba(15,23,42,0.96)", padding:"12px 16px", display:"flex", flexDirection:"column", gap:8 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", gap:10 }}>
+              <select value={bank} onChange={e=>{
+                const b = e.target.value;
+                setBank(b);
+                const snapshots = {
+                  HDFC: { lastTxn:"UPI • -₹1,250 • Today 11:42 AM", passbook:"15 Feb 2026", min:"Keep ≥₹10,000 AQB to avoid charges." },
+                  ICICI:{ lastTxn:"POS • -₹3,480 • Yesterday 7:21 PM", passbook:"10 Feb 2026", min:"Maintain salary credit or AQB as per slab." },
+                  PNB:  { lastTxn:"NEFT • +₹25,000 • 12 Feb 2026",      passbook:"05 Feb 2026", min:"Target ≥₹2,000/month fresh credits to keep account active." },
+                  UNITY:{ lastTxn:"UPI • -₹650 • Today 9:05 AM",        passbook:"18 Jan 2026", min:"Auto‑save ₹500+ every month to keep benefits live." },
+                  OTHER:{ lastTxn:"ATM • -₹2,000 • 03 Feb 2026",       passbook:"20 Jan 2026", min:"Check bank rules; most need periodic transactions to avoid dormancy." },
+                };
+                setBankSnap(snapshots[b] || snapshots.OTHER);
+              }} style={{ background:"rgba(15,23,42,0.9)", color:"#e2eaff", border:"1px solid rgba(148,163,184,0.7)", fontSize:12, padding:"6px 8px" }}>
+                <option value="HDFC">HDFC</option>
+                <option value="UNITY">Unity</option>
+                <option value="PNB">PNB</option>
+                <option value="ICICI">ICICI</option>
+                <option value="OTHER">Other bank</option>
+              </select>
+              <button onClick={()=>{
+                const evt = new Event("change");
+                const map = { HDFC:"HDFC", ICICI:"ICICI", PNB:"PNB", UNITY:"UNITY", OTHER:"OTHER" };
+                const key = map[bank] || "OTHER";
+                const snapshots = {
+                  HDFC: { lastTxn:"UPI • -₹1,250 • Today 11:42 AM", passbook:"15 Feb 2026", min:"Keep ≥₹10,000 AQB to avoid charges." },
+                  ICICI:{ lastTxn:"POS • -₹3,480 • Yesterday 7:21 PM", passbook:"10 Feb 2026", min:"Maintain salary credit or AQB as per slab." },
+                  PNB:  { lastTxn:"NEFT • +₹25,000 • 12 Feb 2026",      passbook:"05 Feb 2026", min:"Target ≥₹2,000/month fresh credits to keep account active." },
+                  UNITY:{ lastTxn:"UPI • -₹650 • Today 9:05 AM",        passbook:"18 Jan 2026", min:"Auto‑save ₹500+ every month to keep benefits live." },
+                  OTHER:{ lastTxn:"ATM • -₹2,000 • 03 Feb 2026",       passbook:"20 Jan 2026", min:"Check bank rules; most need periodic transactions to avoid dormancy." },
+                };
+                setBankSnap(snapshots[key]);
+              }} style={{ fontSize:11, padding:"6px 10px", borderRadius:999, border:"1px solid rgba(99,179,255,0.5)", color:"#63b3ff" }}>
+                Connect
+              </button>
+            </div>
+            <div style={{ fontSize:11, color:"rgba(226,234,255,0.7)", fontFamily:"'JetBrains Mono', monospace" }}>
+              {bankSnap?.lastTxn || "Last transaction will appear here after connect."}
+            </div>
+            <div style={{ fontSize:11, color:"rgba(148,163,184,0.9)" }}>
+              Passbook updated: <span style={{ color:"#e2eaff" }}>{bankSnap?.passbook || "—"}</span>
+            </div>
+            <div style={{ fontSize:11, color:"#fbbf24" }}>
+              {bankSnap?.min || "Most banks require periodic credits or minimum balance to avoid dormancy."}
+            </div>
+          </div>
+          <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(99,179,255,0.7)", marginTop:14 }}>Do You Know Buttons</div>
           {knowledge.slice(0, 2).map((k, i) => (
             <KnowledgePill key={`astro-know-${i}`} question={k.question} answer={k.answer} delay={i * 0.08} />
           ))}
@@ -1388,28 +1537,65 @@ function SmartCrossSell({ token, customerProfile, setCustomerProfile }) {
       <div style={{ fontSize:30, fontWeight:800 }}>⟠ <span style={{ background:"linear-gradient(135deg,#34d399,#63b3ff)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Smart Cross-Sell</span></div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:14 }}>
         <FeatureShard title="Profile Inputs" color="#63b3ff" items={[`Income ₹${profile.income.toLocaleString("en-IN")}`, `Spending ₹${profile.spending.toLocaleString("en-IN")}`, `Loans ₹${profile.loans.toLocaleString("en-IN")}`, `Credit ${profile.creditScore}`, `Risk ${profile.riskLevel}`]} />
-        <div style={{ clipPath:"polygon(8% 0,100% 0,92% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.35)", background:"rgba(99,179,255,0.09)", padding:"16px 20px", display:"flex", flexDirection:"column", gap:10 }}>
-          <label style={{ fontSize:12 }}>Income<input type="range" min={25000} max={220000} step={1000} value={profile.income} onChange={e=>update("income", Number(e.target.value))} style={{ width:"100%" }} /></label>
-          <label style={{ fontSize:12 }}>Spending<input type="range" min={8000} max={160000} step={1000} value={profile.spending} onChange={e=>update("spending", Number(e.target.value))} style={{ width:"100%" }} /></label>
-          <label style={{ fontSize:12 }}>Loans<input type="range" min={0} max={120000} step={1000} value={profile.loans} onChange={e=>update("loans", Number(e.target.value))} style={{ width:"100%" }} /></label>
-          <label style={{ fontSize:12 }}>Credit Score<input type="range" min={500} max={900} step={1} value={profile.creditScore} onChange={e=>update("creditScore", Number(e.target.value))} style={{ width:"100%" }} /></label>
-          <div style={{ display:"flex", gap:8 }}>{["low","medium","high"].map((r)=><button key={r} onClick={()=>update("riskLevel", r)} style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:`1px solid ${profile.riskLevel===r?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.2)"}`, color:profile.riskLevel===r?"#34d399":"rgba(226,234,255,0.7)", padding:"7px 10px", fontSize:11 }}>{r}</button>)}</div>
-          <Btn onClick={run} loading={loading}>POST /cross-sell/recommend</Btn>
+        <div style={{ position:"relative" }}>
+          <div aria-hidden style={{
+            position:"absolute",
+            inset:0,
+            clipPath:"polygon(6% 0, 94% 0, 100% 16%, 100% 84%, 94% 100%, 6% 100%, 0 84%, 0 16%)",
+            border:"1px solid rgba(99,179,255,0.4)",
+            background:"rgba(99,179,255,0.08)",
+            boxShadow:"0 0 16px rgba(99,179,255,0.2)",
+            pointerEvents:"none",
+          }} />
+          <div style={{ position:"relative", padding:"18px 22px", paddingLeft:26, display:"flex", flexDirection:"column", gap:10 }}>
+            <label style={{ fontSize:12, display:"block" }}>Income
+              <input type="range" min={25000} max={220000} step={1000} value={profile.income} onChange={e=>update("income", Number(e.target.value))} style={{ width:"100%", marginTop:4 }} />
+            </label>
+            <label style={{ fontSize:12, display:"block" }}>Spending
+              <input type="range" min={8000} max={160000} step={1000} value={profile.spending} onChange={e=>update("spending", Number(e.target.value))} style={{ width:"100%", marginTop:4 }} />
+            </label>
+            <label style={{ fontSize:12, display:"block" }}>Loans
+              <input type="range" min={0} max={120000} step={1000} value={profile.loans} onChange={e=>update("loans", Number(e.target.value))} style={{ width:"100%", marginTop:4 }} />
+            </label>
+            <label style={{ fontSize:12, display:"block" }}>Credit Score
+              <input type="range" min={500} max={900} step={1} value={profile.creditScore} onChange={e=>update("creditScore", Number(e.target.value))} style={{ width:"100%", marginTop:4 }} />
+            </label>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:4 }}>
+              {["low","medium","high"].map((r)=>(
+                <button key={r} onClick={()=>update("riskLevel", r)} style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:`1px solid ${profile.riskLevel===r?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.2)"}`, color:profile.riskLevel===r?"#34d399":"rgba(226,234,255,0.7)", padding:"7px 10px", fontSize:11 }}>
+                  {r}
+                </button>
+              ))}
+            </div>
+            <div style={{ marginTop:4 }}>
+              <Btn onClick={run} loading={loading}>POST /cross-sell/recommend</Btn>
+            </div>
+          </div>
         </div>
         <FeatureShard title="Reasoning Output" color="#34d399" items={[result.reasoningOutput || "No recommendation yet", `Top confidence ${Math.round((result.confidenceTop || 0) * 100)}%`, `Unsafe filtered ${result.filteredUnsafe || 0}`]} />
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))", gap:14 }}>
         {(result.recommendations || []).map((rec, i) => (
-          <div key={i} style={{ clipPath:"polygon(10% 0,100% 0,90% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.35)", background:"linear-gradient(145deg, rgba(52,211,153,0.12), rgba(99,179,255,0.04))", padding:"16px 20px", display:"flex", flexDirection:"column", gap:10 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
-              <div style={{ fontSize:18, fontWeight:800 }}>{rec.productName}</div>
-              <div style={{ clipPath:"polygon(15% 0,100% 0,85% 100%,0 100%)", border:"1px solid rgba(255,255,255,0.25)", padding:"4px 9px", fontSize:10, color:rec.riskTag==="Low"?"#34d399":"#fbbf24" }}>{rec.riskTag}</div>
-            </div>
-            <div style={{ fontSize:13, color:"rgba(226,234,255,0.82)", lineHeight:1.6 }}>{rec.reason}</div>
-            <div style={{ fontSize:12, color:"#63b3ff" }}>Confidence {Math.round((rec.confidence || 0) * 100)}%</div>
-            <div style={{ display:"flex", gap:8 }}>
-              <button style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"8px 12px", fontSize:12 }}>{rec.ctaPrimary || "Apply"}</button>
-              <button style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:"1px solid rgba(255,255,255,0.28)", background:"rgba(255,255,255,0.06)", color:"#e2eaff", padding:"8px 12px", fontSize:12 }}>{rec.ctaSecondary || "Save"}</button>
+          <div key={i} style={{ position:"relative" }}>
+            <div aria-hidden style={{
+              position:"absolute", inset:0,
+              clipPath:"polygon(8% 0, 92% 0, 100% 18%, 100% 82%, 92% 100%, 8% 100%, 0 82%, 0 18%)",
+              border:"1px solid rgba(52,211,153,0.4)",
+              background:"linear-gradient(145deg, rgba(52,211,153,0.16), rgba(99,179,255,0.06))",
+              boxShadow:"0 0 18px rgba(52,211,153,0.28)",
+              pointerEvents:"none",
+            }} />
+            <div style={{ position:"relative", padding:"16px 22px", paddingLeft:26, display:"flex", flexDirection:"column", gap:10 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
+                <div style={{ fontSize:18, fontWeight:800 }}>{rec.productName}</div>
+                <div style={{ clipPath:"polygon(15% 0,100% 0,85% 100%,0 100%)", border:"1px solid rgba(255,255,255,0.25)", padding:"4px 9px", fontSize:10, color:rec.riskTag==="Low"?"#34d399":"#fbbf24" }}>{rec.riskTag}</div>
+              </div>
+              <div style={{ fontSize:13, color:"rgba(226,234,255,0.82)", lineHeight:1.6 }}>{rec.reason}</div>
+              <div style={{ fontSize:12, color:"#63b3ff" }}>Confidence {Math.round((rec.confidence || 0) * 100)}%</div>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                <button style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"8px 12px", fontSize:12 }}>{rec.ctaPrimary || "Apply"}</button>
+                <button style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:"1px solid rgba(255,255,255,0.28)", background:"rgba(255,255,255,0.06)", color:"#e2eaff", padding:"8px 12px", fontSize:12 }}>{rec.ctaSecondary || "Save"}</button>
+              </div>
             </div>
           </div>
         ))}
@@ -1542,12 +1728,36 @@ function PrivacyCompliance({ token, bankerToken }) {
         <FeatureShard title="Decision Logic" color="#34d399" items={[`Consent: ${data.consentStatus || "Unknown"}`, data.decisionExplainer || ""]} />
         <FeatureShard title="Data Masking" color="#fbbf24" items={Object.entries(data.maskedPreview || {}).map(([k,v]) => `${k}: ${v}`)} />
       </div>
-      <div style={{ clipPath:"polygon(6% 0,100% 0,94% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.35)", background:"rgba(99,179,255,0.08)", padding:"16px 20px" }}>
-        <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.11em", color:"#63b3ff", marginBottom:8 }}>Audit Logs</div>
-        {(data.auditLogs || []).length === 0 ? <div style={{ fontSize:13, color:"rgba(226,234,255,0.72)" }}>No logs yet. Generate feature actions first.</div> :
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>{data.auditLogs.map((l,i)=>(
-            <div key={i} style={{ clipPath:"polygon(8% 0,100% 0,92% 100%,0 100%)", border:"1px solid rgba(255,255,255,0.2)", background:"rgba(3,7,18,0.66)", padding:"8px 12px", fontSize:12, color:"rgba(226,234,255,0.82)" }}>{l.ts} • {l.role} • {l.action} • {l.result}</div>
-          ))}</div>}
+      <div style={{ position:"relative", marginTop:4 }}>
+        <div aria-hidden style={{
+          position:"absolute", inset:0,
+          clipPath:"polygon(5% 0,95% 0,100% 16%,100% 84%,95% 100%,5% 100%,0 84%,0 16%)",
+          border:"1px solid rgba(99,179,255,0.4)",
+          background:"rgba(99,179,255,0.08)",
+          boxShadow:"0 0 16px rgba(99,179,255,0.22)",
+          pointerEvents:"none",
+        }} />
+        <div style={{ position:"relative", padding:"18px 22px", paddingLeft:26 }}>
+          <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.11em", color:"#63b3ff", marginBottom:8, lineHeight:1.3 }}>Audit Logs</div>
+          {(data.auditLogs || []).length === 0 ? (
+            <div style={{ fontSize:13, color:"rgba(226,234,255,0.72)" }}>No logs yet. Generate feature actions first.</div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {data.auditLogs.map((l,i)=>(
+                <div key={i} style={{
+                  border:"1px solid rgba(255,255,255,0.2)",
+                  background:"rgba(3,7,18,0.72)",
+                  padding:"8px 12px",
+                  fontSize:12,
+                  color:"rgba(226,234,255,0.86)",
+                  borderRadius:10,
+                }}>
+                  {l.ts} • {l.role} • {l.action} • {l.result}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       <button onClick={load} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"9px 14px", fontSize:12 }}>Refresh Compliance</button>
     </div>
@@ -1568,12 +1778,39 @@ function ComplianceLayer({ token, bankerToken }) {
 
 // ── SETTINGS ──────────────────────────────────────────────────
 function Settings({ user }) {
+  const [expandedSection, setExpandedSection] = useState(null);
+
+  // Sample data for insurances associated with bank
+  const bankInsurances = [
+    { id: 1, name: "Home Loan Protection Plan", provider: "HDFC Life", coverage: "₹50 Lakhs", premium: "₹2,450/month", status: "Active", nextRenewal: "2026-03-15" },
+    { id: 2, name: "Critical Illness Cover", provider: "ICICI Lombard", coverage: "₹25 Lakhs", premium: "₹1,800/month", status: "Active", nextRenewal: "2026-06-20" },
+    { id: 3, name: "Personal Loan Insurance", provider: "SBI Life", coverage: "₹10 Lakhs", premium: "₹850/month", status: "Active", nextRenewal: "2026-04-10" }
+  ];
+
+  // Sample LIC policies
+  const licPolicies = [
+    { id: 1, name: "Jeevan Anand", policyNumber: "LA-890123456", sumAssured: "₹20 Lakhs", premium: "₹12,500/year", term: "25 years", maturity: "2045-03-01", status: "In Force" },
+    { id: 2, name: "Jeevan Lakshya", policyNumber: "LL-789012345", sumAssured: "₹15 Lakhs", premium: "₹8,600/year", term: "20 years", maturity: "2040-06-15", status: "In Force" }
+  ];
+
+  // Sample other investments
+  const investments = [
+    { id: 1, name: "Public Provident Fund", type: "Government Scheme", amount: "₹1.5 Lakhs/year", current: "₹12.8 Lakhs", returns: "7.1%", status: "Active" },
+    { id: 2, name: "SBI Bluechip Fund", type: "Mutual Fund", amount: "₹5,000/month", current: "₹4.2 Lakhs", returns: "12.3%", status: "Active" },
+    { id: 3, name: "HDFC Mid-Cap Opportunities", type: "Mutual Fund", amount: "₹3,000/month", current: "₹2.1 Lakhs", returns: "15.8%", status: "Active" },
+    { id: 4, name: "National Savings Certificate", type: "Government Scheme", amount: "₹1 Lakhs/year", current: "₹3.5 Lakhs", returns: "6.8%", status: "Active" }
+  ];
+
+  const toggleSection = (section) => {
+    setExpandedSection(expandedSection === section ? null : section);
+  };
+
   return (
     <div style={{ animation:"fadeIn 0.4s ease" }}>
       <div style={{ fontSize:28, fontWeight:800, marginBottom:24 }}>⚙ <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Settings</span></div>
       <div style={{ display:"flex", gap:48, alignItems:"flex-start", flexWrap:"wrap" }}>
         <AstroSphere size={180} color1="#1a3a8e" color2="#0d1f6e" glowColor="#63b3ff" animate />
-        <div style={{ flex:1, minWidth:220 }}>
+        <div style={{ flex:1, minWidth:320 }}>
           <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:28, paddingBottom:24, borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
             <div style={{ width:56, height:56, borderRadius:"50%", background:"linear-gradient(135deg,#1a3a8e,#2d1a8e)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, fontWeight:800, boxShadow:"0 0 24px rgba(99,179,255,0.3)" }}>
               <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{user.name[0]}</span>
@@ -1584,12 +1821,158 @@ function Settings({ user }) {
               <div style={{ marginTop:6, display:"inline-block", padding:"3px 10px", background:"rgba(52,211,153,0.1)", color:"#34d399", borderRadius:20, fontSize:10, fontWeight:700 }}>VERIFIED</div>
             </div>
           </div>
-          {[["Two-Factor Auth","OTP Enabled","#34d399"],["Notifications","Email + Push","#63b3ff"],["Currency","INR (₹)","#e2eaff"],["Encryption","AES-256","#a78bfa"],["Last Login",user.lastLogin,"rgba(226,234,255,0.4)"]].map(([l,v,c]) => (
+          
+          {/* Basic Settings */}
+          {[
+            ["Two-Factor Auth","OTP Enabled","#34d399"],
+            ["Notifications","Email + Push","#63b3ff"],
+            ["Currency","INR (₹)","#e2eaff"],
+            ["Encryption","AES-256","#a78bfa"],
+            ["Last Login",user.lastLogin,"rgba(226,234,255,0.4)"]
+          ].map(([l,v,c]) => (
             <div key={l} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 0", borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
               <span style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.35)" }}>{l}</span>
               <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:13, color:c, fontWeight:600 }}>{v}</span>
             </div>
           ))}
+
+          {/* Bank Insurances Section */}
+          <div style={{ marginTop:24, padding:"16px 0", borderTop:"1px solid rgba(255,255,255,0.08)" }}>
+            <div 
+              onClick={() => toggleSection('insurances')}
+              style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", padding:"8px 0", transition:"all 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.opacity = "0.8"}
+              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+            >
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <span style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.35)" }}>Bank Insurances</span>
+                <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:13, color:"#34d399", fontWeight:600 }}>{bankInsurances.length} Active</span>
+              </div>
+              <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'insurances' ? '▼' : '▶'}</span>
+            </div>
+            
+            {expandedSection === 'insurances' && (
+              <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:12 }}>
+                {bankInsurances.map(insurance => (
+                  <div key={insurance.id} style={{
+                    background:"rgba(255,255,255,0.03)",
+                    border:"1px solid rgba(52,211,153,0.2)",
+                    borderRadius:12,
+                    padding:16,
+                    transition:"all 0.2s"
+                  }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                      <div>
+                        <div style={{ fontWeight:600, fontSize:14, color:"#e2eaff", marginBottom:4 }}>{insurance.name}</div>
+                        <div style={{ fontSize:12, color:"rgba(226,234,255,0.5)", fontFamily:"'JetBrains Mono', monospace" }}>{insurance.provider}</div>
+                      </div>
+                      <div style={{ padding:"4px 8px", background:"rgba(52,211,153,0.15)", color:"#34d399", borderRadius:6, fontSize:10, fontWeight:600 }}>
+                        {insurance.status}
+                      </div>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, fontSize:11, color:"rgba(226,234,255,0.6)" }}>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Coverage:</span> {insurance.coverage}</div>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Premium:</span> {insurance.premium}</div>
+                      <div style={{ gridColumn:"span 2" }}><span style={{ color:"rgba(226,234,255,0.4)" }}>Next Renewal:</span> {insurance.nextRenewal}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* LIC Policies Section */}
+          <div style={{ marginTop:16, padding:"16px 0", borderTop:"1px solid rgba(255,255,255,0.08)" }}>
+            <div 
+              onClick={() => toggleSection('lic')}
+              style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", padding:"8px 0", transition:"all 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.opacity = "0.8"}
+              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+            >
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <span style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.35)" }}>LIC Policies</span>
+                <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:13, color:"#fbbf24", fontWeight:600 }}>{licPolicies.length} Active</span>
+              </div>
+              <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'lic' ? '▼' : '▶'}</span>
+            </div>
+            
+            {expandedSection === 'lic' && (
+              <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:12 }}>
+                {licPolicies.map(policy => (
+                  <div key={policy.id} style={{
+                    background:"rgba(255,255,255,0.03)",
+                    border:"1px solid rgba(251,191,36,0.2)",
+                    borderRadius:12,
+                    padding:16,
+                    transition:"all 0.2s"
+                  }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                      <div>
+                        <div style={{ fontWeight:600, fontSize:14, color:"#e2eaff", marginBottom:4 }}>{policy.name}</div>
+                        <div style={{ fontSize:12, color:"rgba(226,234,255,0.5)", fontFamily:"'JetBrains Mono', monospace" }}>{policy.policyNumber}</div>
+                      </div>
+                      <div style={{ padding:"4px 8px", background:"rgba(251,191,36,0.15)", color:"#fbbf24", borderRadius:6, fontSize:10, fontWeight:600 }}>
+                        {policy.status}
+                      </div>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, fontSize:11, color:"rgba(226,234,255,0.6)" }}>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Sum Assured:</span> {policy.sumAssured}</div>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Premium:</span> {policy.premium}</div>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Term:</span> {policy.term}</div>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Maturity:</span> {policy.maturity}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Other Investments Section */}
+          <div style={{ marginTop:16, padding:"16px 0", borderTop:"1px solid rgba(255,255,255,0.08)" }}>
+            <div 
+              onClick={() => toggleSection('investments')}
+              style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", padding:"8px 0", transition:"all 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.opacity = "0.8"}
+              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+            >
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <span style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.35)" }}>Other Investments</span>
+                <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:13, color:"#a78bfa", fontWeight:600 }}>{investments.length} Active</span>
+              </div>
+              <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'investments' ? '▼' : '▶'}</span>
+            </div>
+            
+            {expandedSection === 'investments' && (
+              <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:12 }}>
+                {investments.map(investment => (
+                  <div key={investment.id} style={{
+                    background:"rgba(255,255,255,0.03)",
+                    border:"1px solid rgba(167,139,250,0.2)",
+                    borderRadius:12,
+                    padding:16,
+                    transition:"all 0.2s"
+                  }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                      <div>
+                        <div style={{ fontWeight:600, fontSize:14, color:"#e2eaff", marginBottom:4 }}>{investment.name}</div>
+                        <div style={{ fontSize:12, color:"rgba(226,234,255,0.5)", fontFamily:"'JetBrains Mono', monospace" }}>{investment.type}</div>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ padding:"4px 8px", background:"rgba(167,139,250,0.15)", color:"#a78bfa", borderRadius:6, fontSize:10, fontWeight:600, marginBottom:4 }}>
+                          {investment.status}
+                        </div>
+                        <div style={{ fontSize:12, color:"#34d399", fontWeight:600 }}>{investment.returns}</div>
+                      </div>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, fontSize:11, color:"rgba(226,234,255,0.6)" }}>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Contribution:</span> {investment.amount}</div>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Current Value:</span> {investment.current}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

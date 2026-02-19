@@ -61,7 +61,9 @@ export default async function handler(req, res) {
     if (req.method !== "POST") return methodNotAllowed(res);
     const body = getBody(req);
     const message = `${body?.message || ""}`;
-    const prompt = `User question: ${message}\nContext: FinPilot personal finance assistant. Keep answer concise and actionable.`;
+    const language = `${body?.language || "en"}`;
+    const langLabel = language === "mr" ? "Marathi" : language === "hi" ? "Hindi" : "English";
+    const prompt = `User question (${langLabel}): ${message}\nContext: FinPilot personal finance assistant. Analyse briefly and respond in ${langLabel} with 3–5 bullet points plus a 1‑line summary, focusing on practical, RBI‑minded guidance. Avoid repeating the same generic sentence.`;
     const generated = await generateAssistantReply(prompt);
     const reply = generated.reply || fallbackReply(message);
     return res.status(200).json({ reply, provider: generated.provider || "local" });

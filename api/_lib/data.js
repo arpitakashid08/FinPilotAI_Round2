@@ -5,6 +5,9 @@ export const mockUser = {
   balance: 124500,
   riskScore: 0.28,
   lastLogin: "Feb 18, 2026",
+  insurances: 2,
+  licPolicies: 1,
+  investments: 4,
 };
 
 export const updatesFeed = {
