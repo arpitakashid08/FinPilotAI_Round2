@@ -100,6 +100,41 @@ const fallbackFeatureModules = {
     ],
   },
 };
+const fallbackCrossSell = {
+  recommendations: [
+    { productName: "Wealth Plus SIP", reason: "Recommended because salary increased and credit utilization is low.", confidence: 0.88, riskTag: "Low", ctaPrimary: "Apply", ctaSecondary: "Save" },
+    { productName: "Secured Credit Card", reason: "Recommended due to stable repayment history and safe risk profile.", confidence: 0.82, riskTag: "Medium", ctaPrimary: "Apply", ctaSecondary: "Save" },
+  ],
+  reasoningOutput: "Recommended because salary increased & low credit utilization.",
+  confidenceTop: 0.88,
+  profile: { riskScore: 48 },
+  filteredUnsafe: 1,
+};
+const fallbackRmSummary = {
+  customer: { customerId: "CUST-7721", name: "Priya Mehta", phoneMasked: "98****10", income: 92000, spending: 51000, loans: 24000, creditScore: 734, riskLevel: "medium" },
+  flags: [
+    { label: "EMI Burden", value: "26%", color: "green" },
+    { label: "Credit Score", value: "734", color: "green" },
+    { label: "Risk Score", value: "52", color: "yellow" },
+  ],
+  recommendation: "Eligible for secured credit card. Avoid unsecured top-up loan this month.",
+  reason: "Moderate EMI burden and healthy score suggest controlled product exposure.",
+};
+const fallbackRmDecision = {
+  allowed: true,
+  recommendation: "Eligible for secured credit card",
+  reason: "Customer profile passes affordability and policy checks.",
+  riskFlag: "yellow",
+};
+const fallbackCompliance = {
+  role: "user",
+  consentStatus: "Active",
+  dataUsed: ["Income", "Spending trend", "Loan burden", "Credit score", "Risk profile"],
+  decisionExplainer: "Decisions are made from affordability, repayment burden, and policy controls.",
+  badges: ["RBI-minded controls", "Data minimization", "Audit-ready", "Role-based access"],
+  maskedPreview: { email: "us****ai", account: "AC****72", mobile: "98****10" },
+  auditLogs: [],
+};
 
 async function callApi(path, opts = {}, fallback) {
   try {
@@ -119,12 +154,12 @@ const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     }, { otpSent: true }),
-  verifyOTP: async ({ otp }) =>
+  verifyOTP: async ({ otp, email = "" }) =>
     callApi("/auth/verify-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ otp }),
-    }, otp === "123456" ? { success: true, token: "fp-local" } : { success: false, message: "Wrong OTP — try 123456" }),
+      body: JSON.stringify({ otp, email }),
+    }, otp === "123456" ? { success: true, token: "fp-local", bankerToken: "fp-banker-local" } : { success: false, message: "Wrong OTP — try 123456" }),
   signup: async ({ name = "", email = "", password = "" } = {}) =>
     callApi("/auth/signup", {
       method: "POST",
@@ -149,6 +184,28 @@ const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message }),
     }, { reply: "Based on your current patterns, keep exposure diversified and track repayment health weekly." }),
+  getBankerToken: async () =>
+    callApi("/auth/banker-token", { method: "POST" }, { bankerToken: "demo-banker-token" }),
+  crossSellRecommend: async ({ profile, token }) =>
+    callApi("/cross-sell/recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(profile),
+    }, fallbackCrossSell),
+  rmCustomerSummary: async ({ bankerToken }) =>
+    callApi("/rm/customer-summary", {
+      headers: bankerToken ? { Authorization: `Bearer ${bankerToken}` } : {},
+    }, fallbackRmSummary),
+  rmProductDecision: async ({ bankerToken, payload }) =>
+    callApi("/rm/product-decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(bankerToken ? { Authorization: `Bearer ${bankerToken}` } : {}) },
+      body: JSON.stringify(payload),
+    }, fallbackRmDecision),
+  complianceStatus: async ({ token }) =>
+    callApi("/compliance/status", {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }, fallbackCompliance),
 };
 const twin = { income: 85000, spending: 42000, liabilities: 12000, cashFlow: 31000, riskScore: 0.28 };
 
@@ -582,7 +639,7 @@ function Login({ onSuccess, goSignup }) {
   const go = async () => {
     setErr(""); setL(true);
     if (!sent) { await api.login({ email, password: pass }); setSent(true); }
-    else { const r = await api.verifyOTP({ otp }); if (r.success) onSuccess(r.token); else setErr(r.message); }
+    else { const r = await api.verifyOTP({ otp, email }); if (r.success) onSuccess(r); else setErr(r.message); }
     setL(false);
   };
 
@@ -1217,75 +1274,148 @@ function FeatureShard({ title, items, color, delay = 0 }) {
   );
 }
 
-function ModuleRail({ module, icon, accent }) {
-  if (!module) return null;
+function SmartCrossSell({ token }) {
+  const [profile, setProfile] = useState({ income: 90000, spending: 52000, loans: 25000, creditScore: 732, riskLevel: "medium" });
+  const [result, setResult] = useState(fallbackCrossSell);
+  const [loading, setLoading] = useState(false);
+  const update = (k, v) => setProfile((p) => ({ ...p, [k]: v }));
+  const run = async () => {
+    setLoading(true);
+    const data = await api.crossSellRecommend({ profile, token });
+    setResult(data);
+    setLoading(false);
+  };
+
   return (
-    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:24 }}>
-      <div>
-        <div style={{ fontSize:30, fontWeight:800 }}>{icon} <span style={{ background:`linear-gradient(135deg,${accent},#a78bfa)`, WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{module.title}</span></div>
-        <div style={{ color:"rgba(226,234,255,0.55)", fontSize:14, marginTop:8 }}>{module.oneLiner}</div>
-      </div>
-
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16 }}>
-        <FeatureShard title="What It Does" items={module.whatItDoes} color={accent} delay={0} />
-        <FeatureShard title="Live Signals" items={module.liveSignals || []} color="#63b3ff" delay={0.06} />
-        <FeatureShard title="Operator Controls" items={module.operatorControls || []} color="#34d399" delay={0.12} />
-      </div>
-
-      <div style={{ display:"grid", gridTemplateColumns:"1.1fr 0.9fr", gap:16 }} className="sphere-row">
-        <div style={{
-          clipPath:"polygon(0 8%, 86% 8%, 100% 50%, 86% 92%, 0 92%, 6% 50%)",
-          border:`1px solid ${accent}45`,
-          background:`radial-gradient(circle at 15% 25%, ${accent}22, rgba(255,255,255,0.02) 60%)`,
-          padding:"24px 34px",
-        }}>
-          <div style={{ fontSize:12, letterSpacing:"0.11em", textTransform:"uppercase", color:accent, marginBottom:12, fontWeight:800 }}>How It Adds In-App Value</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {module.appFunctions.map((fn, i) => (
-              <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:10, fontSize:14, lineHeight:1.65 }}>
-                <span style={{ color:accent, fontWeight:800 }}>{i + 1}.</span>
-                <span style={{ color:"rgba(226,234,255,0.84)" }}>{fn}</span>
-              </div>
-            ))}
-          </div>
+    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:20 }}>
+      <div style={{ fontSize:30, fontWeight:800 }}>⟠ <span style={{ background:"linear-gradient(135deg,#34d399,#63b3ff)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Smart Cross-Sell</span></div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:14 }}>
+        <FeatureShard title="Profile Inputs" color="#63b3ff" items={[`Income ₹${profile.income.toLocaleString("en-IN")}`, `Spending ₹${profile.spending.toLocaleString("en-IN")}`, `Loans ₹${profile.loans.toLocaleString("en-IN")}`, `Credit ${profile.creditScore}`, `Risk ${profile.riskLevel}`]} />
+        <div style={{ clipPath:"polygon(8% 0,100% 0,92% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.35)", background:"rgba(99,179,255,0.09)", padding:"16px 20px", display:"flex", flexDirection:"column", gap:10 }}>
+          <label style={{ fontSize:12 }}>Income<input type="range" min={25000} max={220000} step={1000} value={profile.income} onChange={e=>update("income", Number(e.target.value))} style={{ width:"100%" }} /></label>
+          <label style={{ fontSize:12 }}>Spending<input type="range" min={8000} max={160000} step={1000} value={profile.spending} onChange={e=>update("spending", Number(e.target.value))} style={{ width:"100%" }} /></label>
+          <label style={{ fontSize:12 }}>Loans<input type="range" min={0} max={120000} step={1000} value={profile.loans} onChange={e=>update("loans", Number(e.target.value))} style={{ width:"100%" }} /></label>
+          <label style={{ fontSize:12 }}>Credit Score<input type="range" min={500} max={900} step={1} value={profile.creditScore} onChange={e=>update("creditScore", Number(e.target.value))} style={{ width:"100%" }} /></label>
+          <div style={{ display:"flex", gap:8 }}>{["low","medium","high"].map((r)=><button key={r} onClick={()=>update("riskLevel", r)} style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:`1px solid ${profile.riskLevel===r?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.2)"}`, color:profile.riskLevel===r?"#34d399":"rgba(226,234,255,0.7)", padding:"7px 10px", fontSize:11 }}>{r}</button>)}</div>
+          <Btn onClick={run} loading={loading}>POST /cross-sell/recommend</Btn>
         </div>
-
-        <div style={{
-          clipPath:"polygon(12% 0, 100% 0, 88% 100%, 0 100%)",
-          border:"1px solid rgba(99,179,255,0.3)",
-          background:"rgba(8,18,42,0.72)",
-          padding:"20px 24px",
-          display:"flex", flexDirection:"column", gap:12,
-        }}>
-          <div style={{ fontSize:12, letterSpacing:"0.11em", textTransform:"uppercase", color:"#63b3ff", fontWeight:800 }}>Execution Flow</div>
-          {["Capture customer context", "Generate actionable guidance", "Execute in workflow with controls"].map((step, idx) => (
-            <div key={idx} style={{
-              clipPath:"polygon(10% 0, 100% 0, 90% 100%, 0 100%)",
-              background:"rgba(99,179,255,0.08)",
-              border:"1px solid rgba(99,179,255,0.26)",
-              padding:"10px 14px",
-              fontSize:13,
-              color:"rgba(226,234,255,0.82)",
-            }}>
-              <span style={{ color:"#63b3ff", fontWeight:800 }}>{idx + 1}</span> {step}
+        <FeatureShard title="Reasoning Output" color="#34d399" items={[result.reasoningOutput || "No recommendation yet", `Top confidence ${Math.round((result.confidenceTop || 0) * 100)}%`, `Unsafe filtered ${result.filteredUnsafe || 0}`]} />
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))", gap:14 }}>
+        {(result.recommendations || []).map((rec, i) => (
+          <div key={i} style={{ clipPath:"polygon(10% 0,100% 0,90% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.35)", background:"linear-gradient(145deg, rgba(52,211,153,0.12), rgba(99,179,255,0.04))", padding:"16px 20px", display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
+              <div style={{ fontSize:18, fontWeight:800 }}>{rec.productName}</div>
+              <div style={{ clipPath:"polygon(15% 0,100% 0,85% 100%,0 100%)", border:"1px solid rgba(255,255,255,0.25)", padding:"4px 9px", fontSize:10, color:rec.riskTag==="Low"?"#34d399":"#fbbf24" }}>{rec.riskTag}</div>
             </div>
-          ))}
-        </div>
+            <div style={{ fontSize:13, color:"rgba(226,234,255,0.82)", lineHeight:1.6 }}>{rec.reason}</div>
+            <div style={{ fontSize:12, color:"#63b3ff" }}>Confidence {Math.round((rec.confidence || 0) * 100)}%</div>
+            <div style={{ display:"flex", gap:8 }}>
+              <button style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"8px 12px", fontSize:12 }}>{rec.ctaPrimary || "Apply"}</button>
+              <button style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:"1px solid rgba(255,255,255,0.28)", background:"rgba(255,255,255,0.06)", color:"#e2eaff", padding:"8px 12px", fontSize:12 }}>{rec.ctaSecondary || "Save"}</button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-function CrossSellEngine({ modules }) {
-  return <ModuleRail module={modules?.crossSell} icon="⟠" accent="#34d399" />;
+function BankerRMCopilot({ token, bankerToken, setBankerToken }) {
+  const [summary, setSummary] = useState(null);
+  const [decision, setDecision] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState("Secured Credit Card");
+  const [err, setErr] = useState("");
+  const activeToken = bankerToken || token;
+
+  const loadSummary = async () => {
+    if (!bankerToken) return;
+    const res = await api.rmCustomerSummary({ bankerToken: activeToken });
+    if (res.message) setErr(res.message);
+    else { setErr(""); setSummary(res); }
+  };
+  const getDecision = async () => {
+    if (!summary?.customer) return;
+    const payload = { ...summary.customer, product: selectedProduct };
+    const res = await api.rmProductDecision({ bankerToken: activeToken, payload });
+    if (res.message) setErr(res.message); else { setErr(""); setDecision(res); }
+  };
+  const enableBanker = async () => {
+    const x = await api.getBankerToken();
+    setBankerToken(x.bankerToken || "");
+  };
+
+  useEffect(() => {
+    if (bankerToken) loadSummary();
+  }, [bankerToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:18 }}>
+      <div style={{ fontSize:30, fontWeight:800 }}>⌁ <span style={{ background:"linear-gradient(135deg,#63b3ff,#34d399)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Banker / RM Co-Pilot</span></div>
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+        <button onClick={enableBanker} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#63b3ff", padding:"10px 14px", fontSize:12 }}>Enable Banker Role</button>
+        <button onClick={loadSummary} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.4)", background:"rgba(52,211,153,0.12)", color:"#34d399", padding:"10px 14px", fontSize:12 }}>GET /rm/customer-summary</button>
+      </div>
+      {!bankerToken && <div style={{ color:"rgba(226,234,255,0.7)", fontSize:12 }}>Enable banker role to access RM-protected APIs.</div>}
+      {!!err && <div style={{ color:"#f87171", fontSize:12 }}>{err}</div>}
+      {summary?.customer && (
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }} className="sphere-row">
+          <FeatureShard title="Customer Snapshot" color="#63b3ff" items={Object.entries(summary.customer).map(([k,v]) => `${k}: ${v}`)} />
+          <FeatureShard title="Risk Flags + RM Recommendation" color="#fbbf24" items={[...(summary.flags || []).map((f)=>`${f.label}: ${f.value} (${f.color})`), summary.recommendation, `Why: ${summary.reason}`]} />
+        </div>
+      )}
+      <div style={{ clipPath:"polygon(7% 0,100% 0,93% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.35)", background:"rgba(52,211,153,0.08)", padding:"16px 20px", display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+        <select value={selectedProduct} onChange={(e)=>setSelectedProduct(e.target.value)} style={{ background:"rgba(3,7,18,0.8)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.2)", padding:"8px 10px" }}>
+          <option>Secured Credit Card</option>
+          <option>Instant Personal Loan</option>
+          <option>Wealth Plus SIP</option>
+        </select>
+        <button onClick={getDecision} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"9px 14px", fontSize:12 }}>POST /rm/product-decision</button>
+      </div>
+      {decision && <FeatureShard title="Decision Reasoning" color={decision.allowed ? "#34d399" : "#f87171"} items={[`${decision.allowed ? "Allowed" : "Blocked"}: ${decision.recommendation}`, `Why ${decision.allowed ? "allowed" : "blocked"}: ${decision.reason}`]} />}
+    </div>
+  );
 }
 
-function RMCopilot({ modules }) {
-  return <ModuleRail module={modules?.rmCopilot} icon="⌁" accent="#63b3ff" />;
+function PrivacyCompliance({ token, bankerToken }) {
+  const [data, setData] = useState(fallbackCompliance);
+  const load = async () => {
+    const d = await api.complianceStatus({ token: bankerToken || token });
+    setData(d);
+  };
+  useEffect(() => { load(); }, [token, bankerToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:18 }}>
+      <div style={{ fontSize:30, fontWeight:800 }}>⛨ <span style={{ background:"linear-gradient(135deg,#fbbf24,#63b3ff)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Privacy & Compliance</span></div>
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>{(data.badges || []).map((b) => <div key={b} style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:"1px solid rgba(251,191,36,0.45)", background:"rgba(251,191,36,0.12)", color:"#fbbf24", padding:"8px 12px", fontSize:12 }}>{b}</div>)}</div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))", gap:14 }}>
+        <FeatureShard title="Data Used" color="#63b3ff" items={data.dataUsed || []} />
+        <FeatureShard title="Decision Logic" color="#34d399" items={[`Consent: ${data.consentStatus || "Unknown"}`, data.decisionExplainer || ""]} />
+        <FeatureShard title="Data Masking" color="#fbbf24" items={Object.entries(data.maskedPreview || {}).map(([k,v]) => `${k}: ${v}`)} />
+      </div>
+      <div style={{ clipPath:"polygon(6% 0,100% 0,94% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.35)", background:"rgba(99,179,255,0.08)", padding:"16px 20px" }}>
+        <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.11em", color:"#63b3ff", marginBottom:8 }}>Audit Logs</div>
+        {(data.auditLogs || []).length === 0 ? <div style={{ fontSize:13, color:"rgba(226,234,255,0.72)" }}>No logs yet. Generate feature actions first.</div> :
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>{data.auditLogs.map((l,i)=>(
+            <div key={i} style={{ clipPath:"polygon(8% 0,100% 0,92% 100%,0 100%)", border:"1px solid rgba(255,255,255,0.2)", background:"rgba(3,7,18,0.66)", padding:"8px 12px", fontSize:12, color:"rgba(226,234,255,0.82)" }}>{l.ts} • {l.role} • {l.action} • {l.result}</div>
+          ))}</div>}
+      </div>
+      <button onClick={load} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"9px 14px", fontSize:12 }}>Refresh Compliance</button>
+    </div>
+  );
 }
 
-function ComplianceLayer({ modules }) {
-  return <ModuleRail module={modules?.compliance} icon="⛨" accent="#fbbf24" />;
+function CrossSellEngine({ token }) {
+  return <SmartCrossSell token={token} />;
+}
+
+function RMCopilot({ token, bankerToken, setBankerToken }) {
+  return <BankerRMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} />;
+}
+
+function ComplianceLayer({ token, bankerToken }) {
+  return <PrivacyCompliance token={token} bankerToken={bankerToken} />;
 }
 
 // ── SETTINGS ──────────────────────────────────────────────────
@@ -1712,21 +1842,20 @@ function CreditScore({ user }) {
 }
 
 // ── SHELL ─────────────────────────────────────────────────────
-function Shell({ token }) {
+function Shell({ token, initialBankerToken = "" }) {
   const [user, setUser] = useState(null);
   const [updates, setUpdates] = useState(fallbackUpdates);
-  const [modules, setModules] = useState(fallbackFeatureModules);
+  const [bankerToken, setBankerToken] = useState(initialBankerToken);
   const [loading, setL] = useState(true);
   const [active, setA]  = useState("home");
   const [col, setCol]   = useState(false);
   const mobile = useIsMobile();
 
   useEffect(() => {
-    Promise.all([api.getProfile(token), api.getUpdates(), api.getFeatureModules()])
-      .then(([profile, feed, featureData]) => {
+    Promise.all([api.getProfile(token), api.getUpdates()])
+      .then(([profile, feed]) => {
         setUser(profile);
         setUpdates(feed);
-        setModules(featureData);
       })
       .finally(() => setL(false));
   }, [token]);
@@ -1745,9 +1874,9 @@ function Shell({ token }) {
     home: <Home user={user} updates={updates} />,
     astrofin: <AstroFin updates={updates} />,
     creditai: <CreditScore user={user} />,
-    crosssell: <CrossSellEngine modules={modules} />,
-    rmcopilot: <RMCopilot modules={modules} />,
-    compliance: <ComplianceLayer modules={modules} />,
+    crosssell: <CrossSellEngine token={token} />,
+    rmcopilot: <RMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} />,
+    compliance: <ComplianceLayer token={token} bankerToken={bankerToken} />,
     loan: <Loan />,
     fraud: <Fraud />,
     ai: <AskAstro updates={updates} />,
@@ -1778,13 +1907,14 @@ function Shell({ token }) {
 export default function App() {
   const [phase, setPhase] = useState("intro");
   const [token, setToken] = useState(null);
+  const [bankerToken, setBankerToken] = useState("");
   return (
     <>
       <Styles />
       {phase==="intro"  && <Intro  onDone={()=>setPhase("login")} />}
-      {phase==="login"  && <Login  onSuccess={t=>{setToken(t);setPhase("app");}} goSignup={()=>setPhase("signup")} />}
+      {phase==="login"  && <Login  onSuccess={({ token: t, bankerToken: bt })=>{setToken(t); setBankerToken(bt || ""); setPhase("app");}} goSignup={()=>setPhase("signup")} />}
       {phase==="signup" && <Signup goLogin={()=>setPhase("login")} />}
-      {phase==="app"    && <Shell  token={token} />}
+      {phase==="app"    && <Shell  token={token} initialBankerToken={bankerToken} />}
     </>
   );
 }
