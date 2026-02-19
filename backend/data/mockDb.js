@@ -35,6 +35,72 @@ export const updatesFeed = {
   ],
 };
 
+export const featureModules = {
+  crossSell: {
+    id: "crossSell",
+    title: "Intelligent Cross-Sell Engine",
+    oneLiner: "Suggests right products to the right customer at the right time without spam.",
+    whatItDoes: [
+      "Scores customer-product affinity in real time.",
+      "Ranks recommendations by trust, eligibility, and lifecycle stage.",
+      "Suppresses noisy offers using fatigue and consent-aware controls.",
+    ],
+    aiMlUsed: [
+      "Recommendation systems (hybrid collaborative + rule-guided)",
+      "Customer clustering and propensity modeling",
+      "Contextual bandits for next-best-offer timing",
+    ],
+    techStack: ["Python", "FastAPI", "Feature Store", "Kafka stream triggers", "React in-app widgets"],
+    appFunctions: [
+      "Embedded offer rail inside dashboard and RM screens",
+      "Explain-why tooltip for each recommendation",
+      "Campaign performance telemetry loop",
+    ],
+  },
+  rmCopilot: {
+    id: "rmCopilot",
+    title: "Banker / RM Co-Pilot",
+    oneLiner: "Decision assistant for relationship managers with safer, faster customer actions.",
+    whatItDoes: [
+      "Surfaces risk-aware product suggestions before banker outreach.",
+      "Builds meeting briefs from transaction and profile context.",
+      "Generates compliant response drafts for customer queries.",
+    ],
+    aiMlUsed: [
+      "Decision intelligence with risk scoring",
+      "Retrieval-augmented generation on policy/product docs",
+      "Conversation summarization and intent extraction",
+    ],
+    techStack: ["Python", "LLM APIs", "RBAC admin panel", "Audit logs", "CRM connector"],
+    appFunctions: [
+      "RM cockpit timeline with AI recommendations",
+      "Pre-call prep cards and objection handling prompts",
+      "Post-call summary + follow-up task generation",
+    ],
+  },
+  compliance: {
+    id: "compliance",
+    title: "Privacy & Compliance Layer",
+    oneLiner: "Ensures data protection, explainability, and regulator-ready controls.",
+    whatItDoes: [
+      "Enforces consent, purpose limitation, and role-based data access.",
+      "Logs model decisions for explainability and review.",
+      "Monitors policy violations and escalates alerts automatically.",
+    ],
+    aiMlUsed: [
+      "Explainable AI traces (reason codes + feature attribution)",
+      "Anomaly detection on access patterns",
+      "Policy-rule + ML hybrid compliance checks",
+    ],
+    techStack: ["AES-256 encryption", "RBAC", "Private cloud", "Tokenization", "Immutable audit trail"],
+    appFunctions: [
+      "Compliance pulse monitor inside operations dashboard",
+      "One-click audit evidence export",
+      "Automated breach-risk scoring and alerting",
+    ],
+  },
+};
+
 export function buildAstroReply(message = "") {
   const q = message.toLowerCase();
   if (q.includes("loan") || q.includes("emi")) {

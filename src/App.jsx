@@ -23,6 +23,71 @@ const fallbackUpdates = {
     { question: "Why does fraud monitoring flag device changes?", answer: "First-time device + unusual transaction pattern is a common anomaly signal to prevent account takeover." },
   ],
 };
+const fallbackFeatureModules = {
+  crossSell: {
+    id: "crossSell",
+    title: "Intelligent Cross-Sell Engine",
+    oneLiner: "Suggests right products to the right customer at the right time without spam.",
+    whatItDoes: [
+      "Scores customer-product affinity in real time.",
+      "Ranks recommendations by trust, eligibility, and lifecycle stage.",
+      "Suppresses noisy offers using fatigue and consent-aware controls.",
+    ],
+    aiMlUsed: [
+      "Recommendation systems (hybrid collaborative + rule-guided)",
+      "Customer clustering and propensity modeling",
+      "Contextual bandits for next-best-offer timing",
+    ],
+    techStack: ["Python", "FastAPI", "Feature Store", "Kafka stream triggers", "React in-app widgets"],
+    appFunctions: [
+      "Embedded offer rail inside dashboard and RM screens",
+      "Explain-why tooltip for each recommendation",
+      "Campaign performance telemetry loop",
+    ],
+  },
+  rmCopilot: {
+    id: "rmCopilot",
+    title: "Banker / RM Co-Pilot",
+    oneLiner: "Decision assistant for relationship managers with safer, faster customer actions.",
+    whatItDoes: [
+      "Surfaces risk-aware product suggestions before banker outreach.",
+      "Builds meeting briefs from transaction and profile context.",
+      "Generates compliant response drafts for customer queries.",
+    ],
+    aiMlUsed: [
+      "Decision intelligence with risk scoring",
+      "Retrieval-augmented generation on policy/product docs",
+      "Conversation summarization and intent extraction",
+    ],
+    techStack: ["Python", "LLM APIs", "RBAC admin panel", "Audit logs", "CRM connector"],
+    appFunctions: [
+      "RM cockpit timeline with AI recommendations",
+      "Pre-call prep cards and objection handling prompts",
+      "Post-call summary + follow-up task generation",
+    ],
+  },
+  compliance: {
+    id: "compliance",
+    title: "Privacy & Compliance Layer",
+    oneLiner: "Ensures data protection, explainability, and regulator-ready controls.",
+    whatItDoes: [
+      "Enforces consent, purpose limitation, and role-based data access.",
+      "Logs model decisions for explainability and review.",
+      "Monitors policy violations and escalates alerts automatically.",
+    ],
+    aiMlUsed: [
+      "Explainable AI traces (reason codes + feature attribution)",
+      "Anomaly detection on access patterns",
+      "Policy-rule + ML hybrid compliance checks",
+    ],
+    techStack: ["AES-256 encryption", "RBAC", "Private cloud", "Tokenization", "Immutable audit trail"],
+    appFunctions: [
+      "Compliance pulse monitor inside operations dashboard",
+      "One-click audit evidence export",
+      "Automated breach-risk scoring and alerting",
+    ],
+  },
+};
 
 async function callApi(path, opts = {}, fallback) {
   try {
@@ -59,6 +124,7 @@ const api = {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     }, fallbackProfile),
   getUpdates: async () => callApi("/updates", {}, fallbackUpdates),
+  getFeatureModules: async () => callApi("/features/modules", {}, fallbackFeatureModules),
   voiceReply: async ({ transcript = "" }) =>
     callApi("/voice/reply", {
       method: "POST",
@@ -580,6 +646,9 @@ const NAV = [
   { id:"home",      icon:"⬡", label:"Overview"          },
   { id:"astrofin",  icon:"◈", label:"AstroFin Twin"     },
   { id:"creditai",  icon:"◆", label:"AI Credit Score Improver" },
+  { id:"crosssell", icon:"⟠", label:"Intelligent Cross-Sell Engine" },
+  { id:"rmcopilot", icon:"⌁", label:"Banker / RM Co-Pilot" },
+  { id:"compliance", icon:"⛨", label:"Privacy & Compliance Layer" },
   { id:"loan",      icon:"↯", label:"Loan Simulator"    },
   { id:"fraud",     icon:"◉", label:"Fraud Alerts"      },
   { id:"ai",        icon:"✦", label:"Ask Astro"          },
@@ -590,7 +659,7 @@ const NAV = [
 function Sidebar({ active, setActive, col, setCol, user }) {
   return (
     <aside style={{
-      width: col ? 72 : 230, flexShrink:0,
+      width: col ? 72 : 292, flexShrink:0,
       background: "rgba(3,7,18,0.85)",
       borderRight: "1px solid rgba(255,255,255,0.05)",
       backdropFilter: "blur(24px)",
@@ -1114,6 +1183,99 @@ function Analytics({ updates }) {
   );
 }
 
+function FeatureShard({ title, items, color, delay = 0 }) {
+  return (
+    <div style={{
+      clipPath:"polygon(8% 0, 100% 0, 92% 100%, 0 100%)",
+      background:`linear-gradient(135deg, ${color}10, rgba(255,255,255,0.02))`,
+      border:`1px solid ${color}40`,
+      padding:"18px 22px",
+      animation:`fadeUp 0.35s ease ${delay}s both`,
+    }}>
+      <div style={{ fontSize:12, fontWeight:800, letterSpacing:"0.12em", textTransform:"uppercase", color, marginBottom:10 }}>{title}</div>
+      <div style={{ display:"flex", flexDirection:"column", gap:9 }}>
+        {items.map((it, idx) => (
+          <div key={idx} style={{ display:"flex", alignItems:"flex-start", gap:10, color:"rgba(226,234,255,0.82)", lineHeight:1.6, fontSize:13 }}>
+            <span style={{ marginTop:6, width:6, height:6, borderRadius:"50%", background:color, boxShadow:`0 0 7px ${color}`, flexShrink:0 }} />
+            <span>{it}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ModuleRail({ module, icon, accent }) {
+  if (!module) return null;
+  return (
+    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:24 }}>
+      <div>
+        <div style={{ fontSize:30, fontWeight:800 }}>{icon} <span style={{ background:`linear-gradient(135deg,${accent},#a78bfa)`, WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{module.title}</span></div>
+        <div style={{ color:"rgba(226,234,255,0.55)", fontSize:14, marginTop:8 }}>{module.oneLiner}</div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16 }}>
+        <FeatureShard title="What It Does" items={module.whatItDoes} color={accent} delay={0} />
+        <FeatureShard title="AI / ML Used" items={module.aiMlUsed} color="#63b3ff" delay={0.06} />
+        <FeatureShard title="Tech Stack" items={module.techStack} color="#34d399" delay={0.12} />
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"1.1fr 0.9fr", gap:16 }} className="sphere-row">
+        <div style={{
+          clipPath:"polygon(0 8%, 86% 8%, 100% 50%, 86% 92%, 0 92%, 6% 50%)",
+          border:`1px solid ${accent}45`,
+          background:`radial-gradient(circle at 15% 25%, ${accent}22, rgba(255,255,255,0.02) 60%)`,
+          padding:"24px 34px",
+        }}>
+          <div style={{ fontSize:12, letterSpacing:"0.11em", textTransform:"uppercase", color:accent, marginBottom:12, fontWeight:800 }}>How It Adds In-App Value</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            {module.appFunctions.map((fn, i) => (
+              <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:10, fontSize:14, lineHeight:1.65 }}>
+                <span style={{ color:accent, fontWeight:800 }}>{i + 1}.</span>
+                <span style={{ color:"rgba(226,234,255,0.84)" }}>{fn}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{
+          clipPath:"polygon(12% 0, 100% 0, 88% 100%, 0 100%)",
+          border:"1px solid rgba(99,179,255,0.3)",
+          background:"rgba(8,18,42,0.72)",
+          padding:"20px 24px",
+          display:"flex", flexDirection:"column", gap:12,
+        }}>
+          <div style={{ fontSize:12, letterSpacing:"0.11em", textTransform:"uppercase", color:"#63b3ff", fontWeight:800 }}>Execution Flow</div>
+          {["Sense customer state", "Score recommendations/risk", "Explain and action in UI"].map((step, idx) => (
+            <div key={idx} style={{
+              clipPath:"polygon(10% 0, 100% 0, 90% 100%, 0 100%)",
+              background:"rgba(99,179,255,0.08)",
+              border:"1px solid rgba(99,179,255,0.26)",
+              padding:"10px 14px",
+              fontSize:13,
+              color:"rgba(226,234,255,0.82)",
+            }}>
+              <span style={{ color:"#63b3ff", fontWeight:800 }}>{idx + 1}</span> {step}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CrossSellEngine({ modules }) {
+  return <ModuleRail module={modules?.crossSell} icon="⟠" accent="#34d399" />;
+}
+
+function RMCopilot({ modules }) {
+  return <ModuleRail module={modules?.rmCopilot} icon="⌁" accent="#63b3ff" />;
+}
+
+function ComplianceLayer({ modules }) {
+  return <ModuleRail module={modules?.compliance} icon="⛨" accent="#fbbf24" />;
+}
+
 // ── SETTINGS ──────────────────────────────────────────────────
 function Settings({ user }) {
   return (
@@ -1541,16 +1703,18 @@ function CreditScore({ user }) {
 function Shell({ token }) {
   const [user, setUser] = useState(null);
   const [updates, setUpdates] = useState(fallbackUpdates);
+  const [modules, setModules] = useState(fallbackFeatureModules);
   const [loading, setL] = useState(true);
   const [active, setA]  = useState("home");
   const [col, setCol]   = useState(false);
   const mobile = useIsMobile();
 
   useEffect(() => {
-    Promise.all([api.getProfile(token), api.getUpdates()])
-      .then(([profile, feed]) => {
+    Promise.all([api.getProfile(token), api.getUpdates(), api.getFeatureModules()])
+      .then(([profile, feed, featureData]) => {
         setUser(profile);
         setUpdates(feed);
+        setModules(featureData);
       })
       .finally(() => setL(false));
   }, [token]);
@@ -1569,6 +1733,9 @@ function Shell({ token }) {
     home: <Home user={user} updates={updates} />,
     astrofin: <AstroFin updates={updates} />,
     creditai: <CreditScore user={user} />,
+    crosssell: <CrossSellEngine modules={modules} />,
+    rmcopilot: <RMCopilot modules={modules} />,
+    compliance: <ComplianceLayer modules={modules} />,
     loan: <Loan />,
     fraud: <Fraud />,
     ai: <AskAstro updates={updates} />,
