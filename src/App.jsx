@@ -872,16 +872,34 @@ function OrbitLabel({ value, label, color, x, y }) {
 }
 
 // ── HOME PAGE ─────────────────────────────────────────────────
-function Home({ user, updates }) {
+function Home({ user, updates, customerProfile, setCustomerProfile }) {
+  const [isEditingIncome, setIsEditingIncome] = useState(false);
+  const [tempIncome, setTempIncome] = useState(customerProfile.income);
+  
   const metrics = [
-    { value:`₹${twin.income.toLocaleString("en-IN")}`,   label:"Income",    color:"#34d399", x:"68%", y:"12%" },
-    { value:`₹${twin.spending.toLocaleString("en-IN")}`,  label:"Spending",  color:"#fbbf24", x:"72%", y:"52%" },
-    { value:`₹${twin.cashFlow.toLocaleString("en-IN")}`,  label:"Cash Flow", color:"#63b3ff", x:"5%",  y:"20%" },
-    { value:`₹${twin.liabilities.toLocaleString("en-IN")}`,label:"Liabilities",color:"#f87171",x:"2%",y:"62%"},
+    { value:`₹${customerProfile.income.toLocaleString("en-IN")}`,   label:"Income",    color:"#34d399", x:"68%", y:"12%" },
+    { value:`₹${customerProfile.spending.toLocaleString("en-IN")}`,  label:"Spending",  color:"#fbbf24", x:"72%", y:"52%" },
+    { value:`₹${(customerProfile.income - customerProfile.spending).toLocaleString("en-IN")}`,  label:"Cash Flow", color:"#63b3ff", x:"5%",  y:"20%" },
+    { value:`₹${customerProfile.loans.toLocaleString("en-IN")}`,label:"Liabilities",color:"#f87171",x:"2%",y:"62%"},
   ];
   const latestFinance = updates?.latestFinance || [];
   const stockAlerts = updates?.stockAlerts || [];
   const knowledge = updates?.knowledge || [];
+  
+  const handleIncomeEdit = () => {
+    setIsEditingIncome(true);
+    setTempIncome(customerProfile.income);
+  };
+  
+  const handleIncomeSave = () => {
+    setCustomerProfile(prev => ({ ...prev, income: tempIncome }));
+    setIsEditingIncome(false);
+  };
+  
+  const handleIncomeCancel = () => {
+    setTempIncome(customerProfile.income);
+    setIsEditingIncome(false);
+  };
   return (
     <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:36 }}>
       <div>
@@ -906,19 +924,92 @@ function Home({ user, updates }) {
         {/* Right: balance hero + score */}
         <div style={{ flex:1, minWidth:200, display:"flex", flexDirection:"column", gap:20 }}>
           <div>
-            <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(226,234,255,0.35)", marginBottom:6 }}>Portfolio Balance</div>
-            <div className="balance-num" style={{ fontSize:44, fontWeight:800, fontFamily:"'JetBrains Mono', monospace", background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
-              ₹{user.balance.toLocaleString("en-IN")}
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+              <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(226,234,255,0.35)" }}>Portfolio Balance</div>
+              <button
+                onClick={handleIncomeEdit}
+                style={{
+                  padding:"4px 8px",
+                  background:"rgba(99,179,255,0.1)",
+                  border:"1px solid rgba(99,179,255,0.2)",
+                  borderRadius:6,
+                  color:"#63b3ff",
+                  fontSize:10,
+                  fontWeight:600,
+                  cursor:"pointer",
+                  transition:"all 0.2s"
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,179,255,0.15)"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.3)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "rgba(99,179,255,0.1)"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.2)"; }}
+              >
+                Edit Income
+              </button>
             </div>
+            {isEditingIncome ? (
+              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                <input
+                  type="number"
+                  value={tempIncome}
+                  onChange={(e) => setTempIncome(Number(e.target.value))}
+                  style={{
+                    padding:"8px 12px",
+                    background:"rgba(255,255,255,0.05)",
+                    border:"1px solid rgba(99,179,255,0.3)",
+                    borderRadius:8,
+                    color:"#e2eaff",
+                    fontSize:32,
+                    fontWeight:800,
+                    fontFamily:"'JetBrains Mono', monospace",
+                    width:"100%"
+                  }}
+                />
+                <div style={{ display:"flex", gap:4 }}>
+                  <button
+                    onClick={handleIncomeSave}
+                    style={{
+                      padding:"6px 12px",
+                      background:"rgba(52,211,153,0.15)",
+                      border:"1px solid rgba(52,211,153,0.3)",
+                      borderRadius:6,
+                      color:"#34d399",
+                      fontSize:12,
+                      fontWeight:600,
+                      cursor:"pointer"
+                    }}
+                  >
+                    ✓
+                  </button>
+                  <button
+                    onClick={handleIncomeCancel}
+                    style={{
+                      padding:"6px 12px",
+                      background:"rgba(248,113,113,0.15)",
+                      border:"1px solid rgba(248,113,113,0.3)",
+                      borderRadius:6,
+                      color:"#f87171",
+                      fontSize:12,
+                      fontWeight:600,
+                      cursor:"pointer"
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="balance-num" style={{ fontSize:44, fontWeight:800, fontFamily:"'JetBrains Mono', monospace", background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+                ₹{user.balance.toLocaleString("en-IN")}
+              </div>
+            )}
           </div>
 
           <div style={{ width:"100%", height:1, background:"rgba(255,255,255,0.05)" }} />
 
           {/* Orbital stat rings */}
           {[
-            { label:"Savings Rate",  pct: twin.cashFlow/twin.income,    color:"#34d399" },
-            { label:"Spend Ratio",   pct: twin.spending/twin.income,    color:"#fbbf24" },
-            { label:"Health Score",  pct: 1 - twin.riskScore,           color:"#a78bfa" },
+            { label:"Savings Rate",  pct: (customerProfile.income - customerProfile.spending)/customerProfile.income,    color:"#34d399" },
+            { label:"Spend Ratio",   pct: customerProfile.spending/customerProfile.income,    color:"#fbbf24" },
+            { label:"Health Score",  pct: customerProfile.creditScore/900,           color:"#a78bfa" },
           ].map(s => (
             <div key={s.label} style={{ display:"flex", alignItems:"center", gap:14 }}>
               <svg width={42} height={42} style={{ transform:"rotate(-90deg)", flexShrink:0 }}>
@@ -972,6 +1063,14 @@ function AstroFin({ updates, customerProfile }) {
   const [spentToday, setSpentToday] = useState(1200);
   const [spentMonth, setSpentMonth] = useState(18000);
   const [monthBudget, setMonthBudget] = useState(() => Math.max(5000, Math.round((customerProfile?.income || twin.income) * 0.6)));
+  
+  // Expense breakdown state
+  const [expenses, setExpenses] = useState({
+    grocery: 8000,
+    rent: 12000,
+    electricity: 1500,
+    other: 3500
+  });
 
   useEffect(() => {
     setMonthBudget((b) => {
@@ -1060,6 +1159,63 @@ function AstroFin({ updates, customerProfile }) {
                   style={{ width:"100%", marginTop:6, background:"rgba(3,7,18,0.7)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.14)", borderRadius:10, padding:"10px 12px" }}
                 />
               </label>
+            </div>
+
+            {/* Expense Breakdown Sliders */}
+            <div style={{ marginTop:20, padding:"16px", background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12 }}>
+              <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.4)", marginBottom:16 }}>Expense Breakdown</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:16 }}>
+                {[
+                  { key: 'grocery', label: 'Grocery', icon: '🛒', color: '#34d399' },
+                  { key: 'rent', label: 'Rent', icon: '🏠', color: '#fbbf24' },
+                  { key: 'electricity', label: 'Electricity', icon: '⚡', color: '#63b3ff' },
+                  { key: 'other', label: 'Other', icon: '📦', color: '#a78bfa' }
+                ].map(expense => (
+                  <div key={expense.key} style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+                      <span style={{ fontSize:16 }}>{expense.icon}</span>
+                      <span style={{ fontSize:12, color:"rgba(226,234,255,0.6)" }}>{expense.label}</span>
+                    </div>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                      <span style={{ fontSize:11, fontFamily:"'JetBrains Mono', monospace", color:expense.color }}>
+                        ₹{expenses[expense.key].toLocaleString("en-IN")}
+                      </span>
+                      <span style={{ fontSize:10, color:"rgba(226,234,255,0.4)" }}>
+                        {Math.round((expenses[expense.key] / Object.values(expenses).reduce((a,b) => a+b, 0)) * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={expense.key === 'rent' ? 30000 : 15000}
+                      step={100}
+                      value={expenses[expense.key]}
+                      onChange={(e) => setExpenses(prev => ({ ...prev, [expense.key]: Number(e.target.value) }))}
+                      style={{
+                        width:"100%",
+                        height:4,
+                        background:`transparent`,
+                        outline:"none",
+                        WebkitAppearance:"none"
+                      }}
+                      onInput={(e) => {
+                        const value = (Number(e.target.value) / (expense.key === 'rent' ? 30000 : 15000)) * 100;
+                        e.target.style.background = `linear-gradient(to right, ${expense.color} ${value}%, rgba(255,255,255,0.1) ${value}%)`;
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop:12, padding:"12px", background:"rgba(99,179,255,0.05)", borderRadius:8 }}>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.6)", marginBottom:4 }}>
+                  Total Expenses: <span style={{ color:"#63b3ff", fontWeight:700, fontFamily:"'JetBrains Mono', monospace" }}>
+                    ₹{Object.values(expenses).reduce((a,b) => a+b, 0).toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <div style={{ fontSize:10, color:"rgba(226,234,255,0.4)" }}>
+                  Adjust sliders to see real-time expense allocation
+                </div>
+              </div>
             </div>
 
             <div style={{ height:3, background:"rgba(255,255,255,0.06)", borderRadius:999 }}>
@@ -1639,11 +1795,112 @@ function SmartCrossSell({ token, customerProfile, setCustomerProfile }) {
   const [loading, setLoading] = useState(false);
   const profile = customerProfile;
   const update = (k, v) => setCustomerProfile((p) => ({ ...p, [k]: v }));
+  
+  // Dynamic reasoning logic based on profile data
+  const generateDynamicRecommendations = (profileData) => {
+    const { income, spending, loans, creditScore, riskLevel } = profileData;
+    const savingsRatio = (income - spending) / income;
+    const debtToIncome = loans / income;
+    const creditUtilization = spending / income;
+    
+    const recommendations = [];
+    let reasoningOutput = "";
+    let topConfidence = 0;
+    
+    // Wealth Plus SIP logic
+    if (savingsRatio > 0.3 && creditScore > 700) {
+      recommendations.push({
+        productName: "Wealth Plus SIP",
+        reason: `High savings ratio (${Math.round(savingsRatio * 100)}%) and excellent credit score (${creditScore}) indicate strong investment capacity.`,
+        confidence: 0.92,
+        riskTag: "Low",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.92);
+    } else if (savingsRatio > 0.2) {
+      recommendations.push({
+        productName: "Wealth Plus SIP",
+        reason: `Moderate savings ratio (${Math.round(savingsRatio * 100)}%) suggests potential for systematic investment planning.`,
+        confidence: 0.75,
+        riskTag: "Low",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.75);
+    }
+    
+    // Secured Credit Card logic
+    if (creditScore > 750 && debtToIncome < 0.3) {
+      recommendations.push({
+        productName: "Secured Credit Card",
+        reason: `Excellent credit score (${creditScore}) and low debt-to-income ratio (${Math.round(debtToIncome * 100)}%) qualify for premium secured card.`,
+        confidence: 0.88,
+        riskTag: "Low",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.88);
+    } else if (creditScore > 650 && debtToIncome < 0.5) {
+      recommendations.push({
+        productName: "Secured Credit Card",
+        reason: `Good credit score (${creditScore}) and manageable debt levels (${Math.round(debtToIncome * 100)}% DTI) support secured card eligibility.`,
+        confidence: 0.72,
+        riskTag: "Medium",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.72);
+    }
+    
+    // Instant Personal Loan logic
+    if (spending > income * 0.8 && creditScore > 600) {
+      recommendations.push({
+        productName: "Instant Personal Loan",
+        reason: `High spending ratio (${Math.round(creditUtilization * 100)}%) with decent credit score (${creditScore}) suggests need for liquidity management.`,
+        confidence: 0.68,
+        riskTag: "Medium",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.68);
+    } else if (loans > 50000 && creditScore > 700) {
+      recommendations.push({
+        productName: "Instant Personal Loan",
+        reason: `Existing loan portfolio (₹${loans.toLocaleString("en-IN")}) with strong credit score (${creditScore}) indicates loan consolidation opportunity.`,
+        confidence: 0.74,
+        riskTag: "Low",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.74);
+    }
+    
+    // Generate reasoning output
+    if (recommendations.length > 0) {
+      const topRec = recommendations.reduce((prev, curr) => prev.confidence > curr.confidence ? prev : curr);
+      reasoningOutput = `Primary recommendation: ${topRec.productName}. Based on income ₹${income.toLocaleString("en-IN")}, spending ratio ${Math.round(creditUtilization * 100)}%, and credit score ${creditScore}.`;
+    } else {
+      reasoningOutput = `Profile analysis complete. Income: ₹${income.toLocaleString("en-IN")}, Credit Score: ${creditScore}. Current financial profile is stable - consider savings products.`;
+    }
+    
+    return {
+      recommendations,
+      reasoningOutput,
+      confidenceTop: topConfidence,
+      profile: { riskScore: Math.round((1 - savingsRatio) * 100) },
+      filteredUnsafe: riskLevel === "high" ? 2 : riskLevel === "medium" ? 1 : 0
+    };
+  };
+  
   const run = async () => {
     setLoading(true);
-    const data = await api.crossSellRecommend({ profile, token });
-    setResult(data);
-    setLoading(false);
+    // Simulate API call with dynamic logic
+    setTimeout(() => {
+      const dynamicResult = generateDynamicRecommendations(profile);
+      setResult(dynamicResult);
+      setLoading(false);
+    }, 1000);
   };
 
   return (
@@ -1725,6 +1982,86 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
   const [err, setErr] = useState("");
   const activeToken = bankerToken || token;
 
+  // Generate product-specific reasonings
+  const getProductReasoning = (product, profile) => {
+    const { income, spending, loans, creditScore, riskLevel } = profile;
+    const savingsRatio = (income - spending) / income;
+    const debtToIncome = loans / income;
+    const creditUtilization = spending / income;
+
+    switch (product) {
+      case "Secured Credit Card":
+        if (creditScore > 750 && debtToIncome < 0.3) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Premium Secured Card",
+            reason: "Excellent credit score (>750) and low debt-to-income ratio (<30%) qualify for premium secured credit card with ₹2,00,000 limit and cashback benefits."
+          };
+        } else if (creditScore > 650 && debtToIncome < 0.5) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Standard Secured Card",
+            reason: "Good credit score (>650) and manageable debt levels (<50% DTI) support secured credit card eligibility with ₹1,00,000 limit."
+          };
+        } else {
+          return {
+            allowed: false,
+            recommend: "BLOCKED - Improve Credit Profile",
+            reason: `Credit score ${creditScore} and DTI ${Math.round(debtToIncome * 100)}% below threshold. Focus on reducing existing debt and improving payment history.`
+          };
+        }
+
+      case "Wealth Plus SIP":
+        if (savingsRatio > 0.3 && creditScore > 700) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Wealth Plus SIP",
+            reason: `High savings ratio (${Math.round(savingsRatio * 100)}%) and excellent credit score (${creditScore}) indicate strong investment capacity. Recommended SIP: ₹15,000/month for diversified portfolio.`
+          };
+        } else if (savingsRatio > 0.2) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Starter SIP",
+            reason: `Moderate savings ratio (${Math.round(savingsRatio * 100)}%) suggests potential for systematic investment. Recommended SIP: ₹8,000/month to begin wealth building.`
+          };
+        } else {
+          return {
+            allowed: false,
+            recommend: "BLOCKED - Increase Savings",
+            reason: `Current savings ratio (${Math.round(savingsRatio * 100)}%) below minimum 20%. Focus on increasing savings before starting SIP investments.`
+          };
+        }
+
+      case "Instant Personal Loan":
+        if (creditScore > 750 && debtToIncome < 0.4) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Premium Personal Loan",
+            reason: `Excellent credit score (${creditScore}) and low debt burden qualify for premium personal loan up to ₹5,00,000 at 10.5% APR.`
+          };
+        } else if (creditScore > 650 && debtToIncome < 0.6) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Standard Personal Loan",
+            reason: `Good credit profile supports personal loan up to ₹3,00,000 at 12.5% APR. Recommended for debt consolidation.`
+          };
+        } else {
+          return {
+            allowed: false,
+            recommend: "BLOCKED - High Risk Profile",
+            reason: `High debt-to-income ratio (${Math.round(debtToIncome * 100)}%) and credit score ${creditScore} indicate elevated risk. Reduce existing obligations first.`
+          };
+        }
+
+      default:
+        return {
+          allowed: false,
+          recommend: "UNKNOWN PRODUCT",
+          reason: "Product not recognized in risk assessment system."
+        };
+    }
+  };
+
   const loadSummary = async () => {
     if (!bankerToken) return;
     const res = await api.rmCustomerSummary({ bankerToken: activeToken, customer: customerProfile });
@@ -1733,9 +2070,9 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
   };
   const getDecision = async () => {
     if (!summary?.customer) return;
-    const payload = { ...summary.customer, product: selectedProduct };
-    const res = await api.rmProductDecision({ bankerToken: activeToken, payload });
-    if (res.message) setErr(res.message); else { setErr(""); setDecision(res); }
+    // Use local reasoning logic instead of API call
+    const reasoning = getProductReasoning(selectedProduct, customerProfile);
+    setDecision(reasoning);
   };
   const enableBanker = async () => {
     const x = await api.getBankerToken();
@@ -3018,7 +3355,7 @@ function Shell({ token, initialBankerToken = "" }) {
   );
 
   const pages = {
-    home: <Home user={user} updates={updates} />,
+    home: <Home user={user} updates={updates} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />,
     astrofin: <AstroFin updates={updates} customerProfile={customerProfile} />,
     creditai: <CreditScore user={user} />,
     crosssell: <CrossSellEngine token={token} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />,
