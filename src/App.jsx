@@ -111,7 +111,7 @@ const fallbackCrossSell = {
   filteredUnsafe: 1,
 };
 const fallbackRmSummary = {
-  customer: { customerId: "CUST-7721", name: "Priya Mehta", phoneMasked: "98****10", income: 92000, spending: 51000, loans: 24000, creditScore: 734, riskLevel: "medium" },
+  customer: { customerId: "CUST-7721", name: "Arjun Sharma", phoneMasked: "98****10", income: 92000, spending: 51000, loans: 24000, creditScore: 734, riskLevel: "medium" },
   flags: [
     { label: "EMI Burden", value: "26%", color: "green" },
     { label: "Credit Score", value: "734", color: "green" },
@@ -1228,6 +1228,120 @@ function Fraud() {
           ))}
         </div>
       </div>
+
+      {/* Transaction Patterns Section */}
+      <div style={{ marginTop:32, padding:"24px 0", borderTop:"1px solid rgba(255,255,255,0.08)" }}>
+        <div style={{ fontSize:16, fontWeight:700, marginBottom:16, color:"#e2eaff", display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:18 }}>📊</span>
+          Transaction Patterns
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:16 }}>
+          {[
+            {
+              title: "Unusual Time Activity",
+              description: "Multiple transactions between 2-4 AM, deviating from your normal pattern",
+              frequency: "12 transactions",
+              amount: "₹85,400 total",
+              risk: "Medium",
+              trend: "increasing",
+              color: "#fbbf24"
+            },
+            {
+              title: "High-Frequency Small Amounts",
+              description: "Rapid succession of small transactions under ₹500, possible testing pattern",
+              frequency: "28 transactions",
+              amount: "₹12,600 total", 
+              risk: "Low",
+              trend: "stable",
+              color: "#34d399"
+            },
+            {
+              title: "New Merchant Category",
+              description: "First-time transactions with international cryptocurrency exchanges",
+              frequency: "3 transactions",
+              amount: "₹1,25,000 total",
+              risk: "High", 
+              trend: "new",
+              color: "#f87171"
+            },
+            {
+              title: "Location Velocity Anomaly",
+              description: "Transactions from multiple cities within 2-hour window",
+              frequency: "5 transactions",
+              amount: "₹32,800 total",
+              risk: "Critical",
+              trend: "spike",
+              color: "#ef4444"
+            }
+          ].map((pattern, i) => (
+            <div key={pattern.title} style={{
+              background:"rgba(255,255,255,0.03)",
+              border:`1px solid ${pattern.color}25`,
+              borderRadius:16,
+              padding:20,
+              transition:"all 0.2s",
+              animation:`fadeUp 0.4s ease ${(i+3)*0.1}s both`,
+              borderLeft:`3px solid ${pattern.color}`
+            }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+                <div style={{ fontWeight:600, fontSize:14, color:"#e2eaff" }}>{pattern.title}</div>
+                <div style={{ 
+                  padding:"4px 8px", 
+                  background:`${pattern.color}18`, 
+                  color:pattern.color, 
+                  borderRadius:6, 
+                  fontSize:10, 
+                  fontWeight:700,
+                  textTransform:"uppercase",
+                  letterSpacing:"0.05em"
+                }}>
+                  {pattern.risk}
+                </div>
+              </div>
+              <div style={{ color:"rgba(226,234,255,0.5)", fontSize:12, marginBottom:12, lineHeight:1.4 }}>
+                {pattern.description}
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, fontSize:11 }}>
+                <div>
+                  <span style={{ color:"rgba(226,234,255,0.4)" }}>Frequency:</span>
+                  <div style={{ color:"rgba(226,234,255,0.8)", fontWeight:600, fontFamily:"'JetBrains Mono', monospace" }}>
+                    {pattern.frequency}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color:"rgba(226,234,255,0.4)" }}>Total:</span>
+                  <div style={{ color:"rgba(226,234,255,0.8)", fontWeight:600, fontFamily:"'JetBrains Mono', monospace" }}>
+                    {pattern.amount}
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:6 }}>
+                <span style={{ fontSize:10, color:"rgba(226,234,255,0.4)" }}>Trend:</span>
+                <div style={{ 
+                  display:"flex", 
+                  alignItems:"center", 
+                  gap:4,
+                  padding:"2px 6px",
+                  background:pattern.trend === "increasing" ? "rgba(239,68,68,0.15)" : 
+                           pattern.trend === "new" ? "rgba(251,191,36,0.15)" :
+                           pattern.trend === "spike" ? "rgba(239,68,68,0.2)" :
+                           "rgba(52,211,153,0.15)",
+                  borderRadius:4,
+                  fontSize:9,
+                  fontWeight:600,
+                  color:pattern.trend === "increasing" || pattern.trend === "spike" ? "#ef4444" :
+                         pattern.trend === "new" ? "#fbbf24" : "#34d399"
+                }}>
+                  {pattern.trend === "increasing" && "↗ Rising"}
+                  {pattern.trend === "stable" && "→ Stable"}
+                  {pattern.trend === "new" && "⚠ New"}
+                  {pattern.trend === "spike" && "⚡ Spike"}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1779,30 +1893,77 @@ function ComplianceLayer({ token, bankerToken }) {
 // ── SETTINGS ──────────────────────────────────────────────────
 function Settings({ user }) {
   const [expandedSection, setExpandedSection] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(null);
+  const [newItem, setNewItem] = useState({});
 
   // Sample data for insurances associated with bank
-  const bankInsurances = [
+  const [bankInsurances, setBankInsurances] = useState([
     { id: 1, name: "Home Loan Protection Plan", provider: "HDFC Life", coverage: "₹50 Lakhs", premium: "₹2,450/month", status: "Active", nextRenewal: "2026-03-15" },
     { id: 2, name: "Critical Illness Cover", provider: "ICICI Lombard", coverage: "₹25 Lakhs", premium: "₹1,800/month", status: "Active", nextRenewal: "2026-06-20" },
     { id: 3, name: "Personal Loan Insurance", provider: "SBI Life", coverage: "₹10 Lakhs", premium: "₹850/month", status: "Active", nextRenewal: "2026-04-10" }
-  ];
+  ]);
 
   // Sample LIC policies
-  const licPolicies = [
+  const [licPolicies, setLicPolicies] = useState([
     { id: 1, name: "Jeevan Anand", policyNumber: "LA-890123456", sumAssured: "₹20 Lakhs", premium: "₹12,500/year", term: "25 years", maturity: "2045-03-01", status: "In Force" },
     { id: 2, name: "Jeevan Lakshya", policyNumber: "LL-789012345", sumAssured: "₹15 Lakhs", premium: "₹8,600/year", term: "20 years", maturity: "2040-06-15", status: "In Force" }
-  ];
+  ]);
 
   // Sample other investments
-  const investments = [
+  const [investments, setInvestments] = useState([
     { id: 1, name: "Public Provident Fund", type: "Government Scheme", amount: "₹1.5 Lakhs/year", current: "₹12.8 Lakhs", returns: "7.1%", status: "Active" },
     { id: 2, name: "SBI Bluechip Fund", type: "Mutual Fund", amount: "₹5,000/month", current: "₹4.2 Lakhs", returns: "12.3%", status: "Active" },
     { id: 3, name: "HDFC Mid-Cap Opportunities", type: "Mutual Fund", amount: "₹3,000/month", current: "₹2.1 Lakhs", returns: "15.8%", status: "Active" },
     { id: 4, name: "National Savings Certificate", type: "Government Scheme", amount: "₹1 Lakhs/year", current: "₹3.5 Lakhs", returns: "6.8%", status: "Active" }
-  ];
+  ]);
 
   const toggleSection = (section) => {
     setExpandedSection(expandedSection === section ? null : section);
+  };
+
+  const handleAddItem = (type) => {
+    setShowAddForm(type);
+    setNewItem({});
+  };
+
+  const handleSaveItem = (type) => {
+    const newId = Math.max(...(type === 'insurances' ? bankInsurances : type === 'lic' ? licPolicies : investments).map(item => item.id)) + 1;
+    
+    if (type === 'insurances') {
+      setBankInsurances([...bankInsurances, { 
+        id: newId, 
+        name: newItem.name || 'New Insurance Policy', 
+        provider: newItem.provider || 'Provider Name',
+        coverage: newItem.coverage || '₹10 Lakhs',
+        premium: newItem.premium || '₹1,000/month',
+        status: 'Active',
+        nextRenewal: newItem.nextRenewal || '2026-12-31'
+      }]);
+    } else if (type === 'lic') {
+      setLicPolicies([...licPolicies, { 
+        id: newId, 
+        name: newItem.name || 'New LIC Policy', 
+        policyNumber: newItem.policyNumber || 'LP-123456789',
+        sumAssured: newItem.sumAssured || '₹10 Lakhs',
+        premium: newItem.premium || '₹5,000/year',
+        term: newItem.term || '20 years',
+        maturity: newItem.maturity || '2040-01-01',
+        status: 'In Force'
+      }]);
+    } else if (type === 'investments') {
+      setInvestments([...investments, { 
+        id: newId, 
+        name: newItem.name || 'New Investment', 
+        type: newItem.type || 'Investment Type',
+        amount: newItem.amount || '₹1,000/month',
+        current: newItem.current || '₹12,000',
+        returns: newItem.returns || '8%',
+        status: 'Active'
+      }]);
+    }
+    
+    setShowAddForm(null);
+    setNewItem({});
   };
 
   return (
@@ -1848,7 +2009,27 @@ function Settings({ user }) {
                 <span style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.35)" }}>Bank Insurances</span>
                 <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:13, color:"#34d399", fontWeight:600 }}>{bankInsurances.length} Active</span>
               </div>
-              <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'insurances' ? '▼' : '▶'}</span>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleAddItem('insurances'); }}
+                  style={{
+                    padding:"4px 10px",
+                    background:"rgba(52,211,153,0.15)",
+                    border:"1px solid rgba(52,211,153,0.3)",
+                    borderRadius:6,
+                    color:"#34d399",
+                    fontSize:11,
+                    fontWeight:600,
+                    cursor:"pointer",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(52,211,153,0.25)"; e.currentTarget.style.borderColor = "rgba(52,211,153,0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(52,211,153,0.15)"; e.currentTarget.style.borderColor = "rgba(52,211,153,0.3)"; }}
+                >
+                  + Add
+                </button>
+                <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'insurances' ? '▼' : '▶'}</span>
+              </div>
             </div>
             
             {expandedSection === 'insurances' && (
@@ -1893,7 +2074,27 @@ function Settings({ user }) {
                 <span style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.35)" }}>LIC Policies</span>
                 <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:13, color:"#fbbf24", fontWeight:600 }}>{licPolicies.length} Active</span>
               </div>
-              <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'lic' ? '▼' : '▶'}</span>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleAddItem('lic'); }}
+                  style={{
+                    padding:"4px 10px",
+                    background:"rgba(251,191,36,0.15)",
+                    border:"1px solid rgba(251,191,36,0.3)",
+                    borderRadius:6,
+                    color:"#fbbf24",
+                    fontSize:11,
+                    fontWeight:600,
+                    cursor:"pointer",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(251,191,36,0.25)"; e.currentTarget.style.borderColor = "rgba(251,191,36,0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(251,191,36,0.15)"; e.currentTarget.style.borderColor = "rgba(251,191,36,0.3)"; }}
+                >
+                  + Add
+                </button>
+                <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'lic' ? '▼' : '▶'}</span>
+              </div>
             </div>
             
             {expandedSection === 'lic' && (
@@ -1939,7 +2140,27 @@ function Settings({ user }) {
                 <span style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.35)" }}>Other Investments</span>
                 <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:13, color:"#a78bfa", fontWeight:600 }}>{investments.length} Active</span>
               </div>
-              <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'investments' ? '▼' : '▶'}</span>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleAddItem('investments'); }}
+                  style={{
+                    padding:"4px 10px",
+                    background:"rgba(167,139,250,0.15)",
+                    border:"1px solid rgba(167,139,250,0.3)",
+                    borderRadius:6,
+                    color:"#a78bfa",
+                    fontSize:11,
+                    fontWeight:600,
+                    cursor:"pointer",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(167,139,250,0.25)"; e.currentTarget.style.borderColor = "rgba(167,139,250,0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(167,139,250,0.15)"; e.currentTarget.style.borderColor = "rgba(167,139,250,0.3)"; }}
+                >
+                  + Add
+                </button>
+                <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'investments' ? '▼' : '▶'}</span>
+              </div>
             </div>
             
             {expandedSection === 'investments' && (
@@ -1975,6 +2196,267 @@ function Settings({ user }) {
           </div>
         </div>
       </div>
+
+      {/* Add Item Modal */}
+      {showAddForm && (
+        <div style={{
+          position:"fixed",
+          inset:0,
+          background:"rgba(3,7,18,0.85)",
+          backdropFilter:"blur(8px)",
+          display:"flex",
+          alignItems:"center",
+          justifyContent:"center",
+          zIndex:1000
+        }}>
+          <div style={{
+            background:"rgba(15,23,42,0.95)",
+            border:"1px solid rgba(99,179,255,0.2)",
+            borderRadius:20,
+            padding:32,
+            width:"90%",
+            maxWidth:500,
+            boxShadow:"0 40px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)"
+          }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+              <div style={{ fontSize:20, fontWeight:700 }}>
+                Add New {showAddForm === 'insurances' ? 'Insurance' : showAddForm === 'lic' ? 'LIC Policy' : 'Investment'}
+              </div>
+              <button
+                onClick={() => setShowAddForm(null)}
+                style={{
+                  width:32, height:32,
+                  borderRadius:"50%",
+                  background:"rgba(255,255,255,0.1)",
+                  border:"1px solid rgba(255,255,255,0.2)",
+                  color:"rgba(226,234,255,0.6)",
+                  fontSize:16,
+                  cursor:"pointer",
+                  transition:"all 0.2s"
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.15)"; e.currentTarget.style.color = "rgba(226,234,255,0.8)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "rgba(226,234,255,0.6)"; }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+              {showAddForm === 'insurances' && (
+                <>
+                  <input
+                    placeholder="Insurance Name"
+                    value={newItem.name || ''}
+                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Provider"
+                    value={newItem.provider || ''}
+                    onChange={(e) => setNewItem({...newItem, provider: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Coverage Amount"
+                    value={newItem.coverage || ''}
+                    onChange={(e) => setNewItem({...newItem, coverage: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Premium"
+                    value={newItem.premium || ''}
+                    onChange={(e) => setNewItem({...newItem, premium: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                </>
+              )}
+
+              {showAddForm === 'lic' && (
+                <>
+                  <input
+                    placeholder="Policy Name"
+                    value={newItem.name || ''}
+                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Policy Number"
+                    value={newItem.policyNumber || ''}
+                    onChange={(e) => setNewItem({...newItem, policyNumber: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Sum Assured"
+                    value={newItem.sumAssured || ''}
+                    onChange={(e) => setNewItem({...newItem, sumAssured: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Premium"
+                    value={newItem.premium || ''}
+                    onChange={(e) => setNewItem({...newItem, premium: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                </>
+              )}
+
+              {showAddForm === 'investments' && (
+                <>
+                  <input
+                    placeholder="Investment Name"
+                    value={newItem.name || ''}
+                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Investment Type"
+                    value={newItem.type || ''}
+                    onChange={(e) => setNewItem({...newItem, type: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Contribution Amount"
+                    value={newItem.amount || ''}
+                    onChange={(e) => setNewItem({...newItem, amount: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Current Value"
+                    value={newItem.current || ''}
+                    onChange={(e) => setNewItem({...newItem, current: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                </>
+              )}
+
+              <div style={{ display:"flex", gap:12, marginTop:8 }}>
+                <button
+                  onClick={() => setShowAddForm(null)}
+                  style={{
+                    flex:1,
+                    padding:"14px",
+                    background:"transparent",
+                    border:"1px solid rgba(255,255,255,0.2)",
+                    borderRadius:10,
+                    color:"rgba(226,234,255,0.6)",
+                    fontSize:14,
+                    fontWeight:600,
+                    cursor:"pointer",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleSaveItem(showAddForm)}
+                  style={{
+                    flex:1,
+                    padding:"14px",
+                    background:"linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))",
+                    border:"1px solid rgba(99,179,255,0.4)",
+                    borderRadius:10,
+                    color:"#e2eaff",
+                    fontSize:14,
+                    fontWeight:600,
+                    cursor:"pointer",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(99,179,255,0.3),rgba(167,139,250,0.3))"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.6)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.4)"; }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2501,7 +2983,7 @@ function Shell({ token, initialBankerToken = "" }) {
   const [bankerToken, setBankerToken] = useState(initialBankerToken);
   const [customerProfile, setCustomerProfile] = useState({
     customerId: "CUST-7721",
-    name: "Arjun Sharma",
+    name: "", // Will be set from logged-in user
     phone: "9876543210",
     income: 92000,
     spending: 51000,
@@ -2519,6 +3001,8 @@ function Shell({ token, initialBankerToken = "" }) {
       .then(([profile, feed]) => {
         setUser(profile);
         setUpdates(feed);
+        // Update customer profile with logged-in user's name
+        setCustomerProfile(prev => ({ ...prev, name: profile.name }));
       })
       .finally(() => setL(false));
   }, [token]);
