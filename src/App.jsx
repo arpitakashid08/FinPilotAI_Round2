@@ -1573,6 +1573,7 @@ function Fraud() {
 
 // ── AI CHAT (Ask Astro) ───────────────────────────────────────
 function AskAstro({ updates, customerProfile }) {
+  const mobile = useIsMobile();
   const [msgs, setMsgs] = useState([{ role:"ai", text:"Hi! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy." }]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
