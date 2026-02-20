@@ -1575,6 +1575,79 @@ function Fraud() {
 function AskAstro({ updates, customerProfile }) {
   const mobile = useIsMobile();
   
+  // Voice assistant states
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [recognition, setRecognition] = useState(null);
+  
+  // Check browser support for voice features
+  useEffect(() => {
+    const speechSupported = 'speechSynthesis' in window && 'webkitSpeechRecognition' in window;
+    setVoiceSupported(speechSupported);
+    
+    if (speechSupported) {
+      const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+      const recognitionInstance = new SpeechRecognition();
+      recognitionInstance.continuous = false;
+      recognitionInstance.interimResults = false;
+      recognitionInstance.lang = lang === 'mr' ? 'mr-IN' : lang === 'hi' ? 'hi-IN' : 'en-US';
+      
+      recognitionInstance.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        setIsListening(false);
+      };
+      
+      recognitionInstance.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+      
+      recognitionInstance.onend = () => {
+        setIsListening(false);
+      };
+      
+      setRecognition(recognitionInstance);
+    }
+  }, [lang]);
+  
+  // Voice synthesis function
+  const speakText = (text) => {
+    if (!voiceSupported || !('speechSynthesis' in window)) return;
+    
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.pitch = 1.0;
+    utterance.rate = 0.9;
+    utterance.volume = 0.8;
+    utterance.lang = lang === 'mr' ? 'mr-IN' : lang === 'hi' ? 'hi-IN' : 'en-US';
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+  };
+  
+  // Start voice recognition
+  const startListening = () => {
+    if (!recognition || isListening) return;
+    
+    setIsListening(true);
+    recognition.start();
+  };
+  
+  // Stop voice recognition
+  const stopListening = () => {
+    if (!recognition || !isListening) return;
+    
+    recognition.stop();
+    setIsListening(false);
+  };
+  
   // Language translation functions with properly encoded Unicode
   const translateText = (text, targetLang) => {
     const translations = {
@@ -1742,6 +1815,97 @@ function AskAstro({ updates, customerProfile }) {
       </div>
 
       <div style={{ marginTop:mobile ? 10 : 12, display:"flex", flexDirection:"column", gap:mobile ? 6 : 8 }}>
+        {/* Voice Assistant Controls */}
+        {voiceSupported && (
+          <div style={{ display:"flex", gap:mobile ? 6 : 8, marginBottom:mobile ? 6 : 8, alignItems:"center", padding:mobile ? "8px 12px" : "12px 16px", background:"rgba(99,179,255,0.05)", border:"1px solid rgba(99,179,255,0.2)", borderRadius:mobile ? 8 : 12 }}>
+            {/* Voice Input Button */}
+            <button
+              onClick={isListening ? stopListening : startListening}
+              style={{
+                padding:mobile ? "8px 12px" : "10px 16px",
+                background: isListening ? "rgba(248,113,113,0.2)" : "rgba(99,179,255,0.1)",
+                border: isListening ? "1px solid rgba(248,113,113,0.4)" : "1px solid rgba(99,179,255,0.3)",
+                borderRadius:mobile ? 6 : 8,
+                color: isListening ? "#f87171" : "#e2eaff",
+                fontSize:mobile ? 11 : 12,
+                fontWeight:600,
+                cursor:"pointer",
+                transition:"all 0.2s",
+                display:"flex",
+                alignItems:"center",
+                gap:mobile ? 4 : 6
+              }}
+            >
+              {isListening ? (
+                <>
+                  <div style={{ width:mobile ? 12 : 16, height:mobile ? 12 : 16, borderRadius:"50%", background:"#f87171", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <div style={{ width:mobile ? 6 : 8, height:mobile ? 6 : 8, borderRadius:"50%", background:"rgba(255,255,255,0.3)", margin:"0 auto" }}></div>
+                  </div>
+                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🔴 Stop</span>
+                </>
+              ) : (
+                <>
+                  <div style={{ width:mobile ? 12 : 16, height:mobile ? 12 : 16, borderRadius:"50%", background:"#63b3ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <div style={{ width:mobile ? 6 : 8, height:mobile ? 6 : 8, borderRadius:"50%", background:"rgba(255,255,255,0.3)", margin:"0 auto" }}></div>
+                  </div>
+                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🎤 Start Voice</span>
+                </>
+              )}
+            </button>
+
+            {/* Voice Output Button */}
+            <button
+              onClick={() => speakText(msgs[msgs.length - 1]?.text || "Welcome to FinPilot AI")}
+              disabled={isSpeaking}
+              style={{
+                padding:mobile ? "8px 12px" : "10px 16px",
+                background: isSpeaking ? "rgba(148,163,184,0.2)" : "rgba(52,211,153,0.1)",
+                border: isSpeaking ? "1px solid rgba(148,163,184,0.4)" : "1px solid rgba(52,211,153,0.3)",
+                borderRadius:mobile ? 6 : 8,
+                color: isSpeaking ? "#94a3b8" : "#34d399",
+                fontSize:mobile ? 11 : 12,
+                fontWeight:600,
+                cursor: isSpeaking ? "not-allowed" : "pointer",
+                transition:"all 0.2s",
+                display:"flex",
+                alignItems:"center",
+                gap:mobile ? 4 : 6
+              }}
+            >
+              {isSpeaking ? (
+                <>
+                  <div style={{ width:mobile ? 12 : 16, height:mobile ? 12 : 16, borderRadius:"50%", background:"#94a3b8", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <div style={{ width:mobile ? 6 : 8, height:mobile ? 6 : 8, borderRadius:"50%", background:"rgba(255,255,255,0.3)", margin:"0 auto" }}></div>
+                  </div>
+                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🔊 Speaking...</span>
+                </>
+              ) : (
+                <>
+                  <div style={{ width:mobile ? 12 : 16, height:mobile ? 12 : 16, borderRadius:"50%", background:"#34d399", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <div style={{ width:mobile ? 6 : 8, height:mobile ? 6 : 8, borderRadius:"50%", background:"rgba(255,255,255,0.3)", margin:"0 auto" }}></div>
+                  </div>
+                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🔊 Speak Response</span>
+                </>
+              )}
+            </button>
+
+            {/* Voice Status Indicator */}
+            <div style={{ 
+              fontSize:mobile ? 9 : 10, 
+              color:"rgba(226,234,255,0.6)", 
+              fontFamily:"'JetBrains Mono', monospace",
+              textAlign:"center",
+              padding:mobile ? "4px 8px" : "6px 12px",
+              background:"rgba(15,23,42,0.1)",
+              border:"1px solid rgba(52,211,153,0.2)",
+              borderRadius:mobile ? 4 : 6,
+              minWidth:mobile ? 80 : 120
+            }}>
+              {isListening ? "🎤 Listening..." : isSpeaking ? "🔊 Speaking..." : "🎤 Voice Ready"}
+            </div>
+          </div>
+        )}
+
         <div style={{ display:"flex", gap:mobile ? 6 : 8, flexWrap:"wrap", alignItems:"center" }}>
           <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
             placeholder="Ask about loans, risk, fraud, investments…"
