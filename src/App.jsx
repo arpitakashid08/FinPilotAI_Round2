@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
-const fallbackProfile = { name: "Arjun Sharma", email: "arjun@finpilot.ai", balance: 124500, riskScore: 0.28, lastLogin: "Feb 17, 2026", insurances: 2, licPolicies: 1, investments: 4 };
+const fallbackProfile = { name: "", email: "user@finpilot.ai", balance: 124500, riskScore: 0.28, lastLogin: "Feb 17, 2026", insurances: 2, licPolicies: 1, investments: 4 };
 const fallbackUpdates = {
   latestFinance: [
     { title: "RBI hints at cautious rate path amid inflation softening", cat: "Macro", time: "2h ago", sentiment: "neutral" },
@@ -3630,7 +3630,7 @@ function Shell({ token, initialBankerToken = "" }) {
   const [bankerToken, setBankerToken] = useState(initialBankerToken);
   const [customerProfile, setCustomerProfile] = useState({
     customerId: "CUST-7721",
-    name: "", // Will be set from logged-in user
+    name: "", // Will be set from logged-in user or input
     phone: "9876543210",
     income: 92000,
     spending: 51000,
