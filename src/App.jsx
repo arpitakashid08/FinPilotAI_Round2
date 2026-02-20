@@ -832,8 +832,10 @@ function Sidebar({ active, setActive, col, setCol, user }) {
 }
 
 // ── PAGE HEADER ───────────────────────────────────────────────
-function TopBar({ active, user }) {
+function TopBar({ active, user, mobileMenuOpen, setMobileMenuOpen }) {
   const n = NAV.find(x => x.id === active);
+  const mobile = useIsMobile();
+  
   return (
     <div className="topbar-inner" style={{
       padding:"15px 36px", borderBottom:"1px solid rgba(255,255,255,0.04)",
@@ -842,6 +844,27 @@ function TopBar({ active, user }) {
       position:"sticky", top:0, zIndex:5,
     }}>
       <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+        {mobile && (
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            style={{
+              width:32,
+              height:32,
+              borderRadius:8,
+              border:"1px solid rgba(255,255,255,0.1)",
+              background:"rgba(255,255,255,0.05)",
+              color:"rgba(226,234,255,0.8)",
+              display:"flex",
+              alignItems:"center",
+              justifyContent:"center",
+              fontSize:18,
+              cursor:"pointer",
+              transition:"all 0.2s"
+            }}
+          >
+            {mobileMenuOpen ? "✕" : "☰"}
+          </button>
+        )}
         <span style={{ fontSize:18, filter:"drop-shadow(0 0 5px #63b3ff)" }}>{n?.icon}</span>
         <div>
           <div style={{ fontWeight:700, fontSize:14 }}>{n?.label}</div>
@@ -901,19 +924,19 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
     setIsEditingIncome(false);
   };
   return (
-    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:36, maxWidth:"1200px", margin:"0 auto" }}>
-      <div style={{ marginBottom:16 }}>
+    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:36 }}>
+      <div>
         <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, color:"rgba(99,179,255,0.5)", letterSpacing:"0.15em", marginBottom:8 }}>
           FINANCIAL OVERVIEW · <span style={{ animation:"blink 1.2s step-end infinite" }}>●</span> LIVE
         </div>
-        <div className="hero-name" style={{ fontSize:34, fontWeight:800, lineHeight:1.1, marginBottom:8 }}>
+        <div className="hero-name" style={{ fontSize:34, fontWeight:800, lineHeight:1.1 }}>
           Welcome back, <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{user.name.split(" ")[0]}</span>
         </div>
       </div>
 
       {/* Sphere + floating labels */}
-      <div className="sphere-row" style={{ display:"flex", gap:48, alignItems:"center", flexWrap:"wrap", marginBottom:32 }}>
-        <div style={{ position:"relative", flexShrink:0, marginRight:24 }}>
+      <div className="sphere-row" style={{ display:"flex", gap:48, alignItems:"center", flexWrap:"wrap" }}>
+        <div style={{ position:"relative", flexShrink:0 }}>
           <AstroSphere size={300} color1="#1a3a8e" color2="#0d1f6e" glowColor="#63b3ff"
             label="ASTROFIN" sublabel="TWIN" variant="default" animate />
           {metrics.map((m, i) => (
@@ -922,9 +945,9 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
         </div>
 
         {/* Right: balance hero + score */}
-        <div style={{ flex:1, minWidth:250, display:"flex", flexDirection:"column", gap:20, marginLeft:16 }}>
-          <div style={{ position:"relative", marginBottom:16 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+        <div style={{ flex:1, minWidth:200, display:"flex", flexDirection:"column", gap:20 }}>
+          <div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
               <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(226,234,255,0.35)" }}>Portfolio Balance</div>
               <button
                 onClick={handleIncomeEdit}
@@ -940,8 +963,7 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
                   transition:"all 0.2s",
                   boxShadow:"0 2px 8px rgba(99,179,255,0.2)",
                   position:"relative",
-                  zIndex:10,
-                  flexShrink:0
+                  zIndex:10
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(99,179,255,0.25),rgba(99,179,255,0.15))"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.6)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(99,179,255,0.15),rgba(99,179,255,0.08))"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.4)"; e.currentTarget.style.transform = "translateY(0)"; }}
@@ -950,56 +972,53 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
               </button>
             </div>
             {isEditingIncome ? (
-              <div style={{ display:"flex", gap:12, alignItems:"center", marginTop:8 }}>
+              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
                 <input
                   type="number"
                   value={tempIncome}
                   onChange={(e) => setTempIncome(Number(e.target.value))}
                   style={{
-                    padding:"12px 16px",
+                    padding:"8px 12px",
                     background:"rgba(255,255,255,0.05)",
                     border:"1px solid rgba(99,179,255,0.3)",
                     borderRadius:8,
                     color:"#e2eaff",
-                    fontSize:28,
+                    fontSize:32,
                     fontWeight:800,
                     fontFamily:"'JetBrains Mono', monospace",
-                    width:"100%",
-                    minWidth:200
+                    width:"100%"
                   }}
                 />
-                <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+                <div style={{ display:"flex", gap:4 }}>
                   <button
                     onClick={handleIncomeSave}
                     style={{
-                      padding:"8px 16px",
+                      padding:"6px 12px",
                       background:"rgba(52,211,153,0.15)",
                       border:"1px solid rgba(52,211,153,0.3)",
-                      borderRadius:8,
+                      borderRadius:6,
                       color:"#34d399",
                       fontSize:12,
                       fontWeight:600,
-                      cursor:"pointer",
-                      transition:"all 0.2s"
+                      cursor:"pointer"
                     }}
                   >
-                    ✓ Save
+                    ✓
                   </button>
                   <button
                     onClick={handleIncomeCancel}
                     style={{
-                      padding:"8px 16px",
+                      padding:"6px 12px",
                       background:"rgba(248,113,113,0.15)",
                       border:"1px solid rgba(248,113,113,0.3)",
-                      borderRadius:8,
+                      borderRadius:6,
                       color:"#f87171",
                       fontSize:12,
                       fontWeight:600,
-                      cursor:"pointer",
-                      transition:"all 0.2s"
+                      cursor:"pointer"
                     }}
                   >
-                    ✕ Cancel
+                    ✕
                   </button>
                 </div>
               </div>
@@ -1666,14 +1685,14 @@ function AskAstro({ updates, customerProfile }) {
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"calc(100vh - 140px)", animation:"fadeIn 0.4s ease" }}>
       {/* Sphere header */}
-      <div style={{ display:"flex", alignItems:"center", gap:24, marginBottom:20, flexWrap:"wrap" }}>
-        <AstroSphere size={100} color1="#0a2a5e" color2="#051530" glowColor="#63b3ff" variant="default" animate />
-        <div style={{ flex:1, minWidth:220 }}>
-          <div style={{ fontSize:26, fontWeight:800 }}>✦ Ask <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Astro</span></div>
-          <div style={{ color:"rgba(226,234,255,0.35)", fontFamily:"'JetBrains Mono', monospace", fontSize:11, marginTop:4 }}>// conversational AI — powered by your financial twin</div>
+      <div style={{ display:"flex", alignItems:"center", gap:mobile ? 12 : 16, marginBottom:mobile ? 12 : 16, flexWrap:"wrap" }}>
+        <AstroSphere size={mobile ? 60 : 100} color1="#0a2a5e" color2="#051530" glowColor="#63b3ff" variant="default" animate />
+        <div style={{ flex:1, minWidth:mobile ? 140 : 180 }}>
+          <div style={{ fontSize:mobile ? 20 : 26, fontWeight:800 }}>✦ Ask <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Astro</span></div>
+          <div style={{ color:"rgba(226,234,255,0.35)", fontFamily:"'JetBrains Mono', monospace", fontSize:mobile ? 9 : 11, marginTop:mobile ? 2 : 4 }}>// conversational AI — powered by your financial twin</div>
         </div>
-        <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
-          <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(148,163,184,0.9)" }}>Language</div>
+        <div style={{ display:"flex", gap:mobile ? 4 : 6, alignItems:"center", flexWrap:"wrap" }}>
+          <div style={{ fontSize:mobile ? 9 : 10, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(148,163,184,0.9)" }}>Language</div>
           {[
             { id:"en", label:"English" },
             { id:"mr", label:"Marathi" },
@@ -1682,8 +1701,8 @@ function AskAstro({ updates, customerProfile }) {
             const active = lang === l.id;
             return (
               <button key={l.id} onClick={()=>setLang(l.id)} style={{
-                padding:"6px 10px",
-                fontSize:11,
+                padding:mobile ? "4px 8px" : "6px 10px",
+                fontSize:mobile ? 10 : 11,
                 borderRadius:999,
                 border: active ? "1px solid rgba(99,179,255,0.7)" : "1px solid rgba(148,163,184,0.5)",
                 background: active ? "rgba(99,179,255,0.16)" : "rgba(15,23,42,0.9)",
@@ -1697,122 +1716,65 @@ function AskAstro({ updates, customerProfile }) {
       </div>
 
       {/* Chat */}
-      <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:14, paddingRight:4 }}>
+      <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:mobile ? 10 : 12, paddingRight:mobile ? 2 : 4 }}>
         {msgs.map((m, i) => (
           <div key={i} style={{ display:"flex", justifyContent:m.role==="user"?"flex-end":"flex-start", animation:"fadeUp 0.3s ease" }}>
             {m.role==="ai" && (
-              <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#1a3a8e,#2d1a8e)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0, marginRight:10, marginTop:2, boxShadow:"0 0 10px rgba(99,179,255,0.3)" }}>✦</div>
+              <div style={{ width:mobile ? 24 : 32, height:mobile ? 24 : 32, borderRadius:"50%", background:"linear-gradient(135deg,#1a3a8e,#2d1a8e)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:mobile ? 12 : 14, flexShrink:0, marginRight:mobile ? 6 : 8, marginTop:2, boxShadow:"0 0 10px rgba(99,179,255,0.3)" }}>✦</div>
             )}
             <div style={{
-              maxWidth:"72%", padding:"13px 18px",
+              maxWidth:mobile ? "85%" : "72%", 
+              padding:mobile ? "10px 14px" : "13px 18px",
               borderRadius:m.role==="user"?"18px 18px 4px 18px":"18px 18px 18px 4px",
               background:m.role==="user"?"linear-gradient(135deg,rgba(99,179,255,0.15),rgba(167,139,250,0.15))":"rgba(255,255,255,0.04)",
               border:m.role==="user"?"1px solid rgba(99,179,255,0.2)":"1px solid rgba(255,255,255,0.05)",
-              fontSize:14, lineHeight:1.65, color:m.role==="user"?"#e2eaff":"rgba(226,234,255,0.8)",
+              fontSize:mobile ? 13 : 14, 
+              lineHeight:1.6, 
+              color:m.role==="user"?"#e2eaff":"rgba(226,234,255,0.8)",
+              wordBreak:"break-word"
             }}>{m.text}</div>
           </div>
         ))}
         {thinking && (
-          <div style={{ display:"flex", gap:5, paddingLeft:42 }}>
-            {[0,1,2].map(i => <div key={i} style={{ width:7, height:7, borderRadius:"50%", background:"#63b3ff", animation:`waveBar 0.9s ${i*0.15}s ease-in-out infinite` }} />)}
+          <div style={{ display:"flex", gap:mobile ? 3 : 4, paddingLeft:mobile ? 30 : 42 }}>
+            {[0,1,2].map(i => <div key={i} style={{ width:mobile ? 5 : 6, height:mobile ? 5 : 6, borderRadius:"50%", background:"#63b3ff", animation:`waveBar 0.9s ${i*0.15}s ease-in-out infinite` }} />)}
           </div>
         )}
         <div ref={ref} />
       </div>
 
-      <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
-        <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
+      <div style={{ marginTop:mobile ? 10 : 12, display:"flex", flexDirection:"column", gap:mobile ? 6 : 8 }}>
+        <div style={{ display:"flex", gap:mobile ? 6 : 8, flexWrap:"wrap", alignItems:"center" }}>
           <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
             placeholder="Ask about loans, risk, fraud, investments…"
             className="glass-input"
-            style={{ flex:1, minWidth:0, padding:"13px 18px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:14, color:"#e2eaff", fontSize:14 }} />
+            style={{ flex:1, minWidth:0, padding:mobile ? "10px 14px" : "13px 18px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:mobile ? 10 : 12, color:"#e2eaff", fontSize:mobile ? 13 : 14 }} />
           <button onClick={send} style={{
-            padding:"13px 22px", background:"linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))",
-            border:"1px solid rgba(99,179,255,0.3)", borderRadius:14, color:"#63b3ff",
-            fontWeight:700, fontSize:16, transition:"all 0.2s",
-            opacity: thinking ? 0.6 : 1,
-          }}
-            onMouseEnter={e=>e.currentTarget.style.background="linear-gradient(135deg,rgba(99,179,255,0.3),rgba(167,139,250,0.3))"}
-            onMouseLeave={e=>e.currentTarget.style.background="linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))"}
-            disabled={thinking}
-          >{thinking ? "…" : "↑"}</button>
-          <label style={{ fontSize:11, display:"flex", alignItems:"center", gap:6, cursor:"pointer", color:"rgba(226,234,255,0.7)" }}>
-            📷 Scan passbook
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              style={{ display:"none" }}
-              onChange={e=>{
-                if (!e.target.files?.length) return;
-                setScanMsg("Scanning passbook image… extracted balance, last transaction, and account status.");
-              }}
-            />
-          </label>
+            padding:mobile ? "10px 14px" : "13px 18px",
+            background:"linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))",
+            border:"1px solid rgba(99,179,255,0.3)",
+            borderRadius:mobile ? 10 : 12,
+            color:"#e2eaff",
+            fontSize:mobile ? 13 : 14,
+            fontWeight:700,
+            cursor:"pointer",
+            transition:"all 0.2s"
+          }}>
+            Send
+          </button>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display:"none" }}
+            onChange={e=>{
+              if (!e.target.files?.length) return;
+              setScanMsg("Scanning passbook image… extracted balance, last transaction, and account status.");
+            }}
+          />
         </div>
-        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
-          style={{ display:"none" }} />
-      </div>
-      {!!chatErr && <div style={{ marginTop:8, color:"#f87171", fontSize:12 }}>{chatErr}</div>}
-      {!!scanMsg && <div style={{ marginTop:4, color:"rgba(226,234,255,0.7)", fontSize:11 }}>{scanMsg}</div>}
-
-      <div className="sphere-row" style={{ marginTop:20, display:"flex", gap:18, alignItems:"stretch", flexWrap:"wrap" }}>
-        <div style={{ flex:1, minWidth:240 }}>
-          <VoiceAssistant />
-        </div>
-        <div style={{ flex:1, minWidth:240, display:"flex", flexDirection:"column", gap:10 }}>
-          <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(99,179,255,0.7)" }}>Linked Bank Snapshot</div>
-          <div style={{ clipPath:"polygon(8% 0,92% 0,100% 20%,100% 80%,92% 100%,8% 100%,0 80%,0 20%)", border:"1px solid rgba(148,163,184,0.6)", background:"rgba(15,23,42,0.96)", padding:"12px 16px", display:"flex", flexDirection:"column", gap:8 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", gap:10 }}>
-              <select value={bank} onChange={e=>{
-                const b = e.target.value;
-                setBank(b);
-                const snapshots = {
-                  HDFC: { lastTxn:"UPI • -₹1,250 • Today 11:42 AM", passbook:"15 Feb 2026", min:"Keep ≥₹10,000 AQB to avoid charges." },
-                  ICICI:{ lastTxn:"POS • -₹3,480 • Yesterday 7:21 PM", passbook:"10 Feb 2026", min:"Maintain salary credit or AQB as per slab." },
-                  PNB:  { lastTxn:"NEFT • +₹25,000 • 12 Feb 2026",      passbook:"05 Feb 2026", min:"Target ≥₹2,000/month fresh credits to keep account active." },
-                  UNITY:{ lastTxn:"UPI • -₹650 • Today 9:05 AM",        passbook:"18 Jan 2026", min:"Auto‑save ₹500+ every month to keep benefits live." },
-                  OTHER:{ lastTxn:"ATM • -₹2,000 • 03 Feb 2026",       passbook:"20 Jan 2026", min:"Check bank rules; most need periodic transactions to avoid dormancy." },
-                };
-                setBankSnap(snapshots[b] || snapshots.OTHER);
-              }} style={{ background:"rgba(15,23,42,0.9)", color:"#e2eaff", border:"1px solid rgba(148,163,184,0.7)", fontSize:12, padding:"6px 8px" }}>
-                <option value="HDFC">HDFC</option>
-                <option value="UNITY">Unity</option>
-                <option value="PNB">PNB</option>
-                <option value="ICICI">ICICI</option>
-                <option value="OTHER">Other bank</option>
-              </select>
-              <button onClick={()=>{
-                const evt = new Event("change");
-                const map = { HDFC:"HDFC", ICICI:"ICICI", PNB:"PNB", UNITY:"UNITY", OTHER:"OTHER" };
-                const key = map[bank] || "OTHER";
-                const snapshots = {
-                  HDFC: { lastTxn:"UPI • -₹1,250 • Today 11:42 AM", passbook:"15 Feb 2026", min:"Keep ≥₹10,000 AQB to avoid charges." },
-                  ICICI:{ lastTxn:"POS • -₹3,480 • Yesterday 7:21 PM", passbook:"10 Feb 2026", min:"Maintain salary credit or AQB as per slab." },
-                  PNB:  { lastTxn:"NEFT • +₹25,000 • 12 Feb 2026",      passbook:"05 Feb 2026", min:"Target ≥₹2,000/month fresh credits to keep account active." },
-                  UNITY:{ lastTxn:"UPI • -₹650 • Today 9:05 AM",        passbook:"18 Jan 2026", min:"Auto‑save ₹500+ every month to keep benefits live." },
-                  OTHER:{ lastTxn:"ATM • -₹2,000 • 03 Feb 2026",       passbook:"20 Jan 2026", min:"Check bank rules; most need periodic transactions to avoid dormancy." },
-                };
-                setBankSnap(snapshots[key]);
-              }} style={{ fontSize:11, padding:"6px 10px", borderRadius:999, border:"1px solid rgba(99,179,255,0.5)", color:"#63b3ff" }}>
-                Connect
-              </button>
-            </div>
-            <div style={{ fontSize:11, color:"rgba(226,234,255,0.7)", fontFamily:"'JetBrains Mono', monospace" }}>
-              {bankSnap?.lastTxn || "Last transaction will appear here after connect."}
-            </div>
-            <div style={{ fontSize:11, color:"rgba(148,163,184,0.9)" }}>
-              Passbook updated: <span style={{ color:"#e2eaff" }}>{bankSnap?.passbook || "—"}</span>
-            </div>
-            <div style={{ fontSize:11, color:"#fbbf24" }}>
-              {bankSnap?.min || "Most banks require periodic credits or minimum balance to avoid dormancy."}
-            </div>
-          </div>
-          <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(99,179,255,0.7)", marginTop:14 }}>Do You Know Buttons</div>
-          {knowledge.slice(0, 2).map((k, i) => (
-            <KnowledgePill key={`astro-know-${i}`} question={k.question} answer={k.answer} delay={i * 0.08} />
-          ))}
-        </div>
+        {!!chatErr && <div style={{ marginTop:8, color:"#f87171", fontSize:12 }}>{chatErr}</div>}
+        {!!scanMsg && <div style={{ marginTop:4, color:"rgba(226,234,255,0.7)", fontSize:11 }}>{scanMsg}</div>}
       </div>
     </div>
   );
@@ -3462,6 +3424,7 @@ function Shell({ token, initialBankerToken = "" }) {
   const [loading, setL] = useState(true);
   const [active, setA]  = useState("home");
   const [col, setCol]   = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [welcomePlayed, setWelcomePlayed] = useState(false);
   const mobile = useIsMobile();
 
@@ -3523,18 +3486,50 @@ function Shell({ token, initialBankerToken = "" }) {
         <Sidebar active={active} setActive={setA} col={col} setCol={setCol} user={user} />
       </div>
       <div style={{ flex:1, display:"flex", flexDirection:"column", position:"relative", zIndex:1, overflow:"hidden" }}>
-        <TopBar active={active} user={user} />
-        <div className="page-content" style={{ 
-          flex:1, 
-          overflowY:"auto", 
-          padding: mobile ? "16px 16px 90px" : "32px 40px 40px",
-          maxWidth: mobile ? "100%" : "1400px",
-          margin: "0 auto"
-        }}>
+        <TopBar active={active} user={user} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
+        <div className="page-content" style={{ flex:1, overflowY:"auto", padding: mobile ? "16px 16px 90px" : "32px 40px" }}>
           {pages[active]}
           <InvestorsShowcase featureId={active} title="Investors & Mentors" />
         </div>
       </div>
+      {/* Mobile sidebar */}
+      {mobile && (
+        <div style={{
+          position:"fixed",
+          top:0,
+          left:0,
+          width:"100vw",
+          height:"100vh",
+          background:"rgba(3,7,18,0.95)",
+          zIndex:20,
+          display: mobileMenuOpen ? "block" : "none"
+        }}>
+          <div style={{
+            position:"absolute",
+            top:0,
+            left:0,
+            width:"292px",
+            height:"100vh",
+            background:"rgba(3,7,18,0.85)",
+            borderRight:"1px solid rgba(255,255,255,0.1)",
+            transform: mobileMenuOpen ? "translateX(0)" : "translateX(-100%)",
+            transition:"transform 0.3s ease"
+          }}>
+            <Sidebar active={active} setActive={setA} col={col} setCol={setCol} user={user} />
+          </div>
+          <div 
+            style={{
+              position:"absolute",
+              top:0,
+              left:0,
+              width:"100vw",
+              height:"100vh",
+              background:"transparent"
+            }}
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        </div>
+      )}
       {/* Mobile bottom nav */}
       <BottomNav active={active} setActive={setA} />
     </div>
