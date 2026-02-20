@@ -1573,38 +1573,7 @@ function Fraud() {
 
 // ── AI CHAT (Ask Astro) ───────────────────────────────────────
 function AskAstro({ updates, customerProfile }) {
-  // Language translation functions
-  const translateText = (text, targetLang) => {
-    const translations = {
-      mr: {
-        "Hi! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.": 
-          "नमस्कार! मी आस्ट्रो आहे, तुमचा फिनपायलट एआय सह-पायलट. मला तुमच्या कर्जांबद्दल, जोखम प्रोफाइलबद्दल, फसवणुकी सूचनांबद्दल, किंवा गुंतवणूक धोरणाबद्दल विचारा.",
-        "Based on your current EMI of ₹{amount} and income of ₹{income}, I recommend the following investment strategy:": 
-          "तुमच्या सध्याच्या ₹{amount} ईएमआय आणि ₹{income} उत्पन्नावर आधारित, मी खालील गुंतवणूक धोरण शिफारस करतो:",
-        "Emergency Fund": "आपत्कालीन निधी",
-        "SIP Investment": "एसआयपी गुंतवणूक",
-        "Debt Repayment": "कर्ज परतफेड",
-        "Long-term Growth": "दीर्घकालीन वाढ",
-        "I couldn't generate a response yet. Please try once more.": "मी अजून प्रतिसाद तयार करू शकलो नाही. कृपया एकदा पुन्हा प्रयत्न करा."
-      },
-      hi: {
-        "Hi! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.": 
-          "नमस्ते! मैं आस्ट्रो हूं, आपका फिनपायलट एआई सह-पायलट। मुझसे अपने ऋणों, जोखिम प्रोफाइल, धोखाधड़ी अलर्ट, या निवेश रणनीति के बारे में पूछें।",
-        "Based on your current EMI of ₹{amount} and income of ₹{income}, I recommend the following investment strategy:": 
-          "आपके वर्तमान ₹{amount} ईएमआई और ₹{income} आय के आधार पर, मैं निम्नलिखित निवेश रणनीति की अनुशंसा करता हूं:",
-        "Emergency Fund": "आपातकालीन कोष",
-        "SIP Investment": "एसआईपी निवेश",
-        "Debt Repayment": "कर्ज चुकौती",
-        "Long-term Growth": "दीर्घकालिक विकास",
-        "I couldn't generate a response yet. Please try once more.": "मैं अभी तक प्रतिक्रिया नहीं दे सका। कृपया एक बार फिर से प्रयास करें।"
-      }
-    };
-    
-    if (targetLang === "en") return text;
-    return translations[targetLang]?.[text] || text;
-  };
-
-  const [msgs, setMsgs] = useState([{ role:"ai", text:translateText("Hi! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.", "en") }]);
+  const [msgs, setMsgs] = useState([{ role:"ai", text:"Hi! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy." }]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const [chatErr, setChatErr] = useState("");
@@ -1615,41 +1584,32 @@ function AskAstro({ updates, customerProfile }) {
   const ref = useRef(null);
   const knowledge = updates?.knowledge || [];
   
-  // Update initial message when language changes
-  useEffect(() => {
-    setMsgs([{ role:"ai", text:translateText("Hi! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.", lang) }]);
-  }, [lang]);
-  
   useEffect(() => { ref.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
 
   // Investment strategy generator
-  const generateInvestmentStrategy = (emi, income, lang) => {
+  const generateInvestmentStrategy = (emi, income) => {
     const monthlySavings = Math.max(0, income - emi - (income * 0.3)); // Assuming 30% for basic expenses
     const emergencyFund = monthlySavings * 6; // 6 months emergency fund
     const sipAmount = Math.max(500, monthlySavings * 0.4); // 40% for SIP
     const debtRepayment = Math.max(0, monthlySavings * 0.3); // 30% for debt
     
-    let strategy = translateText(`Based on your current EMI of ₹${emi.toLocaleString("en-IN")} and income of ₹${income.toLocaleString("en-IN")}, I recommend the following investment strategy:`, lang)
-      .replace('{amount}', emi.toLocaleString("en-IN"))
-      .replace('{income}', income.toLocaleString("en-IN"));
-    
-    strategy += "\n\n";
-    
+    let strategy = `Based on your current EMI of ₹${emi.toLocaleString("en-IN")} and income of ₹${income.toLocaleString("en-IN")}, I recommend the following investment strategy:\n\n`;
+
     if (monthlySavings < 2000) {
-      strategy += `⚠️ ${translateText("Low savings detected. Focus on increasing income or reducing expenses first.", lang)}\n\n`;
+      strategy += `⚠️ Low savings detected. Focus on increasing income or reducing expenses first.\n\n`;
     }
-    
-    strategy += `💰 ${translateText("Emergency Fund", lang)}: Build ₹${emergencyFund.toLocaleString("en-IN")} (6 months)\n`;
-    strategy += `📈 ${translateText("SIP Investment", lang)}: ₹${sipAmount.toLocaleString("en-IN")}/month in diversified funds\n`;
-    strategy += `🏦 ${translateText("Debt Repayment", lang)}: ₹${debtRepayment.toLocaleString("en-IN")}/month extra EMI\n`;
-    strategy += `🎯 ${translateText("Long-term Growth", lang)}: Consider equity funds for 10+ year goals\n\n`;
-    
-    strategy += `📊 ${translateText("Asset Allocation:", lang)}\n`;
+
+    strategy += `💰 Emergency Fund: Build ₹${emergencyFund.toLocaleString("en-IN")} (6 months)\n`;
+    strategy += `📈 SIP Investment: ₹${sipAmount.toLocaleString("en-IN")}/month in diversified funds\n`;
+    strategy += `🏦 Debt Repayment: ₹${debtRepayment.toLocaleString("en-IN")}/month extra EMI\n`;
+    strategy += `🎯 Long-term Growth: Consider equity funds for 10+ year goals\n\n`;
+
+    strategy += `📊 Asset Allocation:\n`;
     strategy += `• 40% Equity (high growth)\n`;
     strategy += `• 30% Debt (stability)\n`;
     strategy += `• 20% Gold (inflation hedge)\n`;
     strategy += `• 10% Cash (liquidity)`;
-    
+
     return strategy;
   };
 
@@ -1664,19 +1624,19 @@ function AskAstro({ updates, customerProfile }) {
       let response;
       
       // Check for investment strategy queries
-      if (q.toLowerCase().includes("investment") || q.toLowerCase().includes("strategy") || q.toLowerCase().includes("where to invest") || q.toLowerCase().includes("गुंतवणूक") || q.toLowerCase().includes("निवेश")) {
+      if (q.toLowerCase().includes("investment") || q.toLowerCase().includes("strategy") || q.toLowerCase().includes("where to invest")) {
         // Extract EMI and income from context or use defaults
         const emi = customerProfile?.loans || 24000;
         const income = customerProfile?.income || 92000;
-        response = { reply: generateInvestmentStrategy(emi, income, lang) };
+        response = { reply: generateInvestmentStrategy(emi, income) };
       } else {
         // Use existing API for other queries
         response = await api.askAstro({ message: q, language: lang });
       }
       
-      setMsgs(m => [...m, { role:"ai", text: response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang) }]);
+      setMsgs(m => [...m, { role:"ai", text: response.reply || "I couldn't generate a response yet. Please try once more." }]);
     } catch {
-      setChatErr(translateText("Ask Astro is temporarily unavailable. Please retry.", lang));
+      setChatErr("Ask Astro is temporarily unavailable. Please retry.");
     } finally {
       setThinking(false);
     }
