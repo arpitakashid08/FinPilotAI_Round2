@@ -1575,16 +1575,95 @@ function Fraud() {
 function AskAstro({ updates, customerProfile }) {
   const mobile = useIsMobile();
   
-  // Voice assistant states (simplified to avoid errors)
+  // Voice assistant states
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [recognition, setRecognition] = useState(null);
   
   // Check browser support for voice features
   useEffect(() => {
     const speechSupported = 'speechSynthesis' in window;
-    setVoiceSupported(speechSupported);
-  }, []);
+    const recognitionSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+    setVoiceSupported(speechSupported && recognitionSupported);
+    
+    if (recognitionSupported) {
+      const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+      const recognitionInstance = new SpeechRecognition();
+      recognitionInstance.continuous = false;
+      recognitionInstance.interimResults = false;
+      recognitionInstance.lang = lang === 'mr' ? 'mr-IN' : lang === 'hi' ? 'hi-IN' : 'en-US';
+      
+      recognitionInstance.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        setIsListening(false);
+        
+        // Auto-send the voice input
+        if (transcript.trim()) {
+          setTimeout(() => {
+            const inputElement = document.querySelector('.glass-input');
+            if (inputElement) {
+              inputElement.value = transcript;
+              setInput(transcript);
+              // Trigger send function
+              handleVoiceSend(transcript);
+            }
+          }, 500);
+        }
+      };
+      
+      recognitionInstance.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+      
+      recognitionInstance.onend = () => {
+        setIsListening(false);
+      };
+      
+      setRecognition(recognitionInstance);
+    }
+  }, [lang]);
+  
+  // Handle voice input sending
+  const handleVoiceSend = (voiceText) => {
+    if (!voiceText.trim() || thinking) return;
+    const q = voiceText.trim(); 
+    setInput("");
+    
+    setMsgs(m => [...m, { role:"user", text: q }]);
+    setThinking(true);
+    setChatErr("");
+    
+    // Simulate AI response for voice input
+    setTimeout(() => {
+      let response;
+      
+      // Check for investment strategy queries
+      if (q.toLowerCase().includes("investment") || q.toLowerCase().includes("strategy") || q.toLowerCase().includes("where to invest")) {
+        const emi = customerProfile?.loans || 24000;
+        const income = customerProfile?.income || 92000;
+        response = { reply: generateInvestmentStrategy(emi, income) };
+      } else if (q.toLowerCase().includes("hello") || q.toLowerCase().includes("hi")) {
+        const userName = customerProfile?.name || "there";
+        response = { reply: `Hello ${userName}! I'm Astro, your FinPilot AI co-pilot. How can I help you today?` };
+      } else if (q.toLowerCase().includes("name")) {
+        const userName = customerProfile?.name || "User";
+        response = { reply: `Your name is ${userName}. I'm here to help with your financial questions!` };
+      } else {
+        response = { reply: `I understand you're asking about: "${q}". Let me help you with that. This is a simulated response for voice input.` };
+      }
+      
+      setMsgs(m => [...m, { role:"ai", text: response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang) }]);
+      setThinking(false);
+      
+      // Auto-speak the response for voice interaction
+      setTimeout(() => {
+        speakText(response.reply);
+      }, 1000);
+    }, 1500);
+  };
   
   // Voice synthesis function
   const speakText = (text) => {
@@ -1606,18 +1685,19 @@ function AskAstro({ updates, customerProfile }) {
     window.speechSynthesis.speak(utterance);
   };
   
-  // Start voice recognition (simplified)
+  // Start voice recognition
   const startListening = () => {
+    if (!recognition || isListening) return;
+    
     setIsListening(true);
-    // Simulate voice input for now
-    setTimeout(() => {
-      setInput("What is my investment strategy?");
-      setIsListening(false);
-    }, 2000);
+    recognition.start();
   };
   
   // Stop voice recognition
   const stopListening = () => {
+    if (!recognition || !isListening) return;
+    
+    recognition.stop();
     setIsListening(false);
   };
   
@@ -1625,8 +1705,8 @@ function AskAstro({ updates, customerProfile }) {
   const translateText = (text, targetLang) => {
     const translations = {
       mr: {
-        "Hi! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.": 
-          "\u0928\u092e\u0938\u094d\u0915\u093e\u0930! \u092e\u0940 \u0906\u0938\u094d\u091f\u094d\u0930\u094b \u0906\u0939\u0947, \u0924\u0941\u092e\u091a\u093e \u092b\u093f\u0928\u092a\u093e\u092f\u0932\u091f \u090f\u0906\u090f \u0938\u0939-\u092a\u093e\u092f\u0932\u091f. \u092e\u0932\u093e \u0924\u0941\u092e\u091a\u094d\u092f\u093e \u0915\u0930\u094d\u091c\u093e\u0902\u092c\u0926\u094d\u0926\u0932, \u091c\u094b\u0916\u092e \u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932\u092c\u0926\u094d\u0926\u0932, \u092b\u0938\u0935\u0923\u0941\u0915\u0940 \u0938\u0942\u091a\u0928\u093e\u0902\u092c\u0926\u094d\u0932, \u0915\u093f\u0902\u0935\u093e \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915 \u0927\u094b\u0930\u0923\u093e\u092c\u0926\u094d\u0926\u0932 \u0935\u093f\u091a\u093e\u0930\u093e.",
+        "Hi {userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.": 
+          "\u0928\u092e\u0938\u094d\u0915\u093e\u0930 {userName}! \u092e\u0940 \u0906\u0938\u094d\u091f\u094d\u0930\u094b \u0906\u0939\u0947, \u0924\u0941\u092e\u091a\u094d\u092f\u093e \u092b\u093f\u0928\u092a\u093e\u092f\u0932\u091f \u090f\u0906\u090f \u0938\u0939-\u092a\u093e\u092f\u0932\u091f. \u092e\u0932\u093e \u0924\u0941\u092e\u091a\u094d\u092f\u093e \u0915\u0930\u094d\u091c\u093e\u0902\u092c\u0926\u094d\u0926\u0932, \u091c\u094b\u0916\u092e \u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932\u092c\u0926\u094d\u0926\u0932, \u092b\u0938\u0935\u0923\u0941\u0915\u0940 \u0938\u0942\u091a\u0928\u093e\u0902\u092c\u0926\u094d\u0926\u0932, \u0915\u093f\u0902\u0935\u093e \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915 \u0927\u094b\u0930\u0923\u093e\u092c\u0926\u094d\u0926\u0932 \u0935\u093f\u091a\u093e\u0930\u093e.",
         "Based on your current EMI of ₹{amount} and income of ₹{income}, I recommend the following investment strategy:": 
           "\u0924\u0941\u092e\u091a\u094d\u092f\u093e \u0938\u0927\u094d\u092f\u093e\u091a\u094d\u092f\u093e \u20b9{amount} \u0908\u090f\u092e\u0906\u090f \u0906\u0923\u093f \u20b9{income} \u0909\u0924\u094d\u092a\u0928\u094d\u0928\u093e\u0935\u0930 \u0906\u0927\u093e\u0930\u093f\u0924, \u092e\u0940 \u0916\u093e\u0932\u0940\u0932 \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915 \u0927\u094b\u0930\u0923 \u0936\u093f\u092b\u093e\u0930\u0938 \u0915\u0930\u0924\u094b:",
         "Emergency Fund": "\u0906\u092a\u0924\u094d\u0915\u093e\u0932\u0940\u0928 \u0928\u093f\u0927\u0940",
@@ -1636,8 +1716,8 @@ function AskAstro({ updates, customerProfile }) {
         "I couldn't generate a response yet. Please try once more.": "\u092e\u0940 \u0905\u091c\u0942\u0928 \u092a\u094d\u0930\u0924\u093f\u0938\u093e\u0926 \u0924\u092f\u093e\u0930 \u0915\u0930\u0942 \u0936\u0915\u0932\u094b \u0928\u093e\u0939\u0940. \u0915\u0943\u092a\u092f\u093e \u090f\u0915\u0926\u093e \u092a\u0941\u0928\u094d\u0939\u093e \u092a\u094d\u0930\u092f\u0924\u094d\u0928 \u0915\u0930\u093e."
       },
       hi: {
-        "Hi! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.": 
-          "\u0928\u092e\u0938\u094d\u0924\u0947! \u092e\u0948\u0902 \u0906\u0938\u094d\u091f\u094d\u0930\u094b \u0939\u0942\u0902, \u0906\u092a\u0915\u093e \u092b\u093f\u0928\u092a\u093e\u092f\u0932\u091f \u090f\u0906\u0908 \u0938\u0939-\u092a\u093e\u092f\u0932\u091f\u0964 \u092e\u0941\u091d\u0938\u0947 \u0905\u092a\u0928\u0947 \u0923\u0923\u094b\u0902, \u091c\u094b\u0916\u093f\u092e \u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932, \u0927\u094b\u0916\u093e\u0927\u0921\u093c\u0940 \u0905\u0932\u0930\u094d\u091f, \u092f\u093e \u0928\u093f\u0935\u0947\u0936 \u0930\u0923\u0928\u0940\u0924\u093f \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092a\u0942\u091b\u0947\u0902\u0964",
+        "Hi {userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.": 
+          "\u0928\u092e\u0938\u094d\u0924\u0947 {userName}! \u092e\u0948\u0902 \u0906\u0938\u094d\u091f\u094d\u0930\u094b \u0939\u0942\u0902, \u0906\u092a\u0915\u093e \u092b\u093f\u0928\u092a\u093e\u092f\u0932\u091f \u090f\u0906\u0908 \u0938\u0939-\u092a\u093e\u092f\u0932\u091f\u0964 \u092e\u0941\u091d\u0938\u0947 \u0905\u092a\u0928\u0947 \u0923\u0923\u094b\u0902, \u091c\u094b\u0916\u093f\u092e \u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932, \u0927\u094b\u0916\u093e\u0927\u0921\u093c\u0940 \u0905\u0932\u0930\u094d\u091f, \u092f\u093e \u0928\u093f\u0935\u0947\u0936 \u0930\u0923\u0928\u0940\u0924\u093f \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092a\u0942\u091b\u0947\u0902\u0964",
         "Based on your current EMI of ₹{amount} and income of ₹{income}, I recommend the following investment strategy:": 
           "\u0906\u092a\u0915\u0947 \u0935\u0930\u094d\u0924\u092e\u093e\u0928 \u20b9{amount} \u0908\u090f\u092e\u0906\u0908 \u0914\u0930 \u20b9{income} \u0906\u092f \u0915\u0947 \u0906\u0927\u093e\u0930 \u092a\u0930, \u092e\u0948\u0902 \u0928\u093f\u092e\u094d\u0928\u0932\u093f\u0916\u093f\u0924 \u0928\u093f\u0935\u0947\u0936 \u0930\u0923\u0928\u0940\u0924\u093f \u0915\u0940 \u0905\u0928\u0941\u0936\u0902\u0938\u093e \u0915\u0930\u0924\u093e \u0939\u0942\u0902:",
         "Emergency Fund": "\u0906\u092a\u093e\u0924\u0915\u093e\u0932\u0940\u0928 \u0915\u094b\u0937",
@@ -1663,10 +1743,12 @@ function AskAstro({ updates, customerProfile }) {
   const ref = useRef(null);
   const knowledge = updates?.knowledge || [];
   
-  // Update initial message when language changes
+  // Update initial message when language changes or user name changes
   useEffect(() => {
-    setMsgs([{ role:"ai", text:translateText("Hi! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.", lang) }]);
-  }, [lang]);
+    const userName = customerProfile?.name || "there";
+    const welcomeMessage = `Hi ${userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.`;
+    setMsgs([{ role:"ai", text:translateText(welcomeMessage, lang) }]);
+  }, [lang, customerProfile?.name]);
   
   useEffect(() => { ref.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
 
@@ -3565,8 +3647,9 @@ function Shell({ token, initialBankerToken = "" }) {
 
   // Welcome voice message
   const playWelcomeMessage = () => {
-    if ('speechSynthesis' in window && !welcomePlayed) {
-      const utterance = new SpeechSynthesisUtterance('Welcome to FinPilot AI. Your intelligent financial co-pilot is ready to assist you.');
+    if ('speechSynthesis' in window && !welcomePlayed && customerProfile?.name) {
+      const userName = customerProfile.name || 'User';
+      const utterance = new SpeechSynthesisUtterance(`Welcome back to FinPilot AI, ${userName}. Your intelligent financial co-pilot is ready to assist you.`);
       utterance.pitch = 1.0;
       utterance.rate = 0.9;
       utterance.volume = 0.8;
@@ -3584,7 +3667,10 @@ function Shell({ token, initialBankerToken = "" }) {
         // Update customer profile with logged-in user's name
         setCustomerProfile(prev => ({ ...prev, name: profile.name }));
         // Play welcome message after user data is loaded
-        setTimeout(() => playWelcomeMessage(), 1000);
+        setTimeout(() => {
+          setCustomerProfile(prev => ({ ...prev, name: profile.name }));
+          playWelcomeMessage();
+        }, 1000);
       })
       .finally(() => setL(false));
   }, [token]);
