@@ -901,19 +901,19 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
     setIsEditingIncome(false);
   };
   return (
-    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:36 }}>
-      <div>
+    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:36, maxWidth:"1200px", margin:"0 auto" }}>
+      <div style={{ marginBottom:16 }}>
         <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, color:"rgba(99,179,255,0.5)", letterSpacing:"0.15em", marginBottom:8 }}>
           FINANCIAL OVERVIEW · <span style={{ animation:"blink 1.2s step-end infinite" }}>●</span> LIVE
         </div>
-        <div className="hero-name" style={{ fontSize:34, fontWeight:800, lineHeight:1.1 }}>
+        <div className="hero-name" style={{ fontSize:34, fontWeight:800, lineHeight:1.1, marginBottom:8 }}>
           Welcome back, <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{user.name.split(" ")[0]}</span>
         </div>
       </div>
 
       {/* Sphere + floating labels */}
-      <div className="sphere-row" style={{ display:"flex", gap:48, alignItems:"center", flexWrap:"wrap" }}>
-        <div style={{ position:"relative", flexShrink:0 }}>
+      <div className="sphere-row" style={{ display:"flex", gap:48, alignItems:"center", flexWrap:"wrap", marginBottom:32 }}>
+        <div style={{ position:"relative", flexShrink:0, marginRight:24 }}>
           <AstroSphere size={300} color1="#1a3a8e" color2="#0d1f6e" glowColor="#63b3ff"
             label="ASTROFIN" sublabel="TWIN" variant="default" animate />
           {metrics.map((m, i) => (
@@ -922,9 +922,9 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
         </div>
 
         {/* Right: balance hero + score */}
-        <div style={{ flex:1, minWidth:200, display:"flex", flexDirection:"column", gap:20 }}>
-          <div>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+        <div style={{ flex:1, minWidth:250, display:"flex", flexDirection:"column", gap:20, marginLeft:16 }}>
+          <div style={{ position:"relative", marginBottom:16 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
               <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(226,234,255,0.35)" }}>Portfolio Balance</div>
               <button
                 onClick={handleIncomeEdit}
@@ -940,7 +940,8 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
                   transition:"all 0.2s",
                   boxShadow:"0 2px 8px rgba(99,179,255,0.2)",
                   position:"relative",
-                  zIndex:10
+                  zIndex:10,
+                  flexShrink:0
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(99,179,255,0.25),rgba(99,179,255,0.15))"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.6)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(99,179,255,0.15),rgba(99,179,255,0.08))"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.4)"; e.currentTarget.style.transform = "translateY(0)"; }}
@@ -949,53 +950,56 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
               </button>
             </div>
             {isEditingIncome ? (
-              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+              <div style={{ display:"flex", gap:12, alignItems:"center", marginTop:8 }}>
                 <input
                   type="number"
                   value={tempIncome}
                   onChange={(e) => setTempIncome(Number(e.target.value))}
                   style={{
-                    padding:"8px 12px",
+                    padding:"12px 16px",
                     background:"rgba(255,255,255,0.05)",
                     border:"1px solid rgba(99,179,255,0.3)",
                     borderRadius:8,
                     color:"#e2eaff",
-                    fontSize:32,
+                    fontSize:28,
                     fontWeight:800,
                     fontFamily:"'JetBrains Mono', monospace",
-                    width:"100%"
+                    width:"100%",
+                    minWidth:200
                   }}
                 />
-                <div style={{ display:"flex", gap:4 }}>
+                <div style={{ display:"flex", gap:8, flexShrink:0 }}>
                   <button
                     onClick={handleIncomeSave}
                     style={{
-                      padding:"6px 12px",
+                      padding:"8px 16px",
                       background:"rgba(52,211,153,0.15)",
                       border:"1px solid rgba(52,211,153,0.3)",
-                      borderRadius:6,
+                      borderRadius:8,
                       color:"#34d399",
                       fontSize:12,
                       fontWeight:600,
-                      cursor:"pointer"
+                      cursor:"pointer",
+                      transition:"all 0.2s"
                     }}
                   >
-                    ✓
+                    ✓ Save
                   </button>
                   <button
                     onClick={handleIncomeCancel}
                     style={{
-                      padding:"6px 12px",
+                      padding:"8px 16px",
                       background:"rgba(248,113,113,0.15)",
                       border:"1px solid rgba(248,113,113,0.3)",
-                      borderRadius:6,
+                      borderRadius:8,
                       color:"#f87171",
                       fontSize:12,
                       fontWeight:600,
-                      cursor:"pointer"
+                      cursor:"pointer",
+                      transition:"all 0.2s"
                     }}
                   >
-                    ✕
+                    ✕ Cancel
                   </button>
                 </div>
               </div>
@@ -3458,7 +3462,21 @@ function Shell({ token, initialBankerToken = "" }) {
   const [loading, setL] = useState(true);
   const [active, setA]  = useState("home");
   const [col, setCol]   = useState(false);
+  const [welcomePlayed, setWelcomePlayed] = useState(false);
   const mobile = useIsMobile();
+
+  // Welcome voice message
+  const playWelcomeMessage = () => {
+    if ('speechSynthesis' in window && !welcomePlayed) {
+      const utterance = new SpeechSynthesisUtterance('Welcome to FinPilot AI. Your intelligent financial co-pilot is ready to assist you.');
+      utterance.pitch = 1.0;
+      utterance.rate = 0.9;
+      utterance.volume = 0.8;
+      utterance.lang = 'en-US';
+      speechSynthesis.speak(utterance);
+      setWelcomePlayed(true);
+    }
+  };
 
   useEffect(() => {
     Promise.all([api.getProfile(token), api.getUpdates()])
@@ -3467,6 +3485,8 @@ function Shell({ token, initialBankerToken = "" }) {
         setUpdates(feed);
         // Update customer profile with logged-in user's name
         setCustomerProfile(prev => ({ ...prev, name: profile.name }));
+        // Play welcome message after user data is loaded
+        setTimeout(() => playWelcomeMessage(), 1000);
       })
       .finally(() => setL(false));
   }, [token]);
@@ -3504,7 +3524,13 @@ function Shell({ token, initialBankerToken = "" }) {
       </div>
       <div style={{ flex:1, display:"flex", flexDirection:"column", position:"relative", zIndex:1, overflow:"hidden" }}>
         <TopBar active={active} user={user} />
-        <div className="page-content" style={{ flex:1, overflowY:"auto", padding: mobile ? "16px 16px 90px" : "32px 40px" }}>
+        <div className="page-content" style={{ 
+          flex:1, 
+          overflowY:"auto", 
+          padding: mobile ? "16px 16px 90px" : "32px 40px 40px",
+          maxWidth: mobile ? "100%" : "1400px",
+          margin: "0 auto"
+        }}>
           {pages[active]}
           <InvestorsShowcase featureId={active} title="Investors & Mentors" />
         </div>
