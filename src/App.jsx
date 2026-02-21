@@ -1646,6 +1646,13 @@ function AskAstro({ updates, customerProfile }) {
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [recognition, setRecognition] = useState(null);
   
+  // Update initial message when language changes or user name changes
+  useEffect(() => {
+    const userName = customerProfile?.name || "there";
+    const welcomeMessage = `Hi ${userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.`;
+    setMsgs([{ role:"ai", text:translateText(welcomeMessage, lang) }]);
+  }, [lang, customerProfile?.name]);
+  
   // Check browser support for voice features
   useEffect(() => {
     const speechSupported = 'speechSynthesis' in window;
@@ -2443,6 +2450,10 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
   const [err, setErr] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [sessionSecure, setSessionSecure] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState([]);
+  const [customerJourney, setCustomerJourney] = useState([]);
+  const [riskAnalysis, setRiskAnalysis] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
   const activeToken = bankerToken || token;
 
   // Security & Authentication Layer
@@ -2463,7 +2474,76 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
     if (authenticateBanker()) {
       setBankerToken("banker_" + Date.now());
       setErr("✅ Banker mode enabled - Secure session active");
+      generateCustomerJourney();
+      generateRiskAnalysis();
     }
+  };
+
+  // Generate AI-powered recommendations
+  const generateAIRecommendations = () => {
+    const recommendations = [
+      {
+        product: "Premium Credit Card",
+        confidence: 85,
+        reasoning: `High income (${customerProfile?.income || 92000}) and excellent credit score (${customerProfile?.creditScore || 734}) qualify for premium products.`,
+        riskLevel: "Low",
+        expectedRevenue: "₹2,500/month",
+        nextAction: "Schedule premium card consultation"
+      },
+      {
+        product: "Wealth Management SIP",
+        confidence: 78,
+        reasoning: `Strong savings ratio detected. Customer can benefit from systematic investment planning.`,
+        riskLevel: "Medium",
+        expectedRevenue: "₹1,800/month",
+        nextAction: "Prepare SIP proposal"
+      },
+      {
+        product: "Personal Loan Top-up",
+        confidence: 65,
+        reasoning: `Existing relationship with good payment history. Eligible for additional credit facility.`,
+        riskLevel: "Medium",
+        expectedRevenue: "₹1,200/month",
+        nextAction: "Verify employment stability"
+      }
+    ];
+    setAiRecommendations(recommendations);
+  };
+
+  // Generate customer journey insights
+  const generateCustomerJourney = () => {
+    const journey = [
+      { stage: "Initial Contact", date: "2026-01-15", interaction: "Account opening", sentiment: "Positive" },
+      { stage: "Onboarding", date: "2026-01-20", interaction: "KYC completion", sentiment: "Neutral" },
+      { stage: "First Product", date: "2026-02-01", interaction: "Debit card issued", sentiment: "Positive" },
+      { stage: "Cross-sell", date: "2026-02-10", interaction: "Credit card application", sentiment: "Positive" },
+      { stage: "Current", date: "2026-02-21", interaction: "Relationship review", sentiment: "Positive" }
+    ];
+    setCustomerJourney(journey);
+  };
+
+  // Generate risk analysis
+  const generateRiskAnalysis = () => {
+    const analysis = {
+      overallRisk: "Low",
+      creditRisk: "Low",
+      behaviorRisk: "Medium",
+      marketRisk: "Low",
+      complianceRisk: "Low",
+      riskFactors: [
+        { factor: "Credit Score", value: customerProfile?.creditScore || 734, status: "Healthy" },
+        { factor: "Debt-to-Income", value: `${Math.round(((customerProfile?.loans || 24000) / (customerProfile?.income || 92000)) * 100)}%`, status: "Acceptable" },
+        { factor: "Account Age", value: "6 months", status: "Growing" },
+        { factor: "Payment History", value: "100%", status: "Excellent" }
+      ],
+      recommendations: [
+        "Continue monitoring spending patterns",
+        "Opportunity for wealth management products",
+        "Consider relationship pricing benefits",
+        "Schedule quarterly review"
+      ]
+    };
+    setRiskAnalysis(analysis);
   };
 
   // Generate product-specific reasonings
@@ -2601,6 +2681,8 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
       <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
         <button onClick={enableBanker} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#63b3ff", padding:"10px 14px", fontSize:12 }}>Enable Banker Role</button>
         <button onClick={loadSummary} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.4)", background:"rgba(52,211,153,0.12)", color:"#34d399", padding:"10px 14px", fontSize:12 }}>GET /rm/customer-summary</button>
+        <button onClick={generateAIRecommendations} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(167,139,250,0.4)", background:"rgba(167,139,250,0.12)", color:"#a78bfa", padding:"10px 14px", fontSize:12 }}>🤖 AI Recommendations</button>
+        <button onClick={generateRiskAnalysis} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(251,191,36,0.4)", background:"rgba(251,191,36,0.12)", color:"#fbbf24", padding:"10px 14px", fontSize:12 }}>📊 Risk Analysis</button>
       </div>
       {!bankerToken && <div style={{ color:"rgba(226,234,255,0.7)", fontSize:12 }}>Enable banker role to access RM-protected APIs.</div>}
       {!!err && <div style={{ color:"#f87171", fontSize:12 }}>{err}</div>}
@@ -3711,20 +3793,46 @@ function VoiceAssistant() {
 
 // ── CREDIT SCORE IMPROVER PAGE ────────────────────────────────
 function CreditScore({ user }) {
-  const currentScore = 720;
-  const targetScore = 800;
+  const [currentScore, setCurrentScore] = useState(720);
+  const [targetScore, setTargetScore] = useState(800);
   const maxScore = 900;
+  const [selectedAction, setSelectedAction] = useState(null);
+  const [completedActions, setCompletedActions] = useState([]);
+  const [aiInsights, setAiInsights] = useState([]);
+  const [simulationMode, setSimulationMode] = useState(false);
+  
   const progress = (currentScore - 300) / (maxScore - 300);
   const targetProgress = (targetScore - 300) / (maxScore - 300);
 
   const actions = [
-    { task: "Pay credit card bills on time", impact: "+15 pts", status: "pending", color: "#fbbf24" },
-    { task: "Reduce credit utilization to <30%", impact: "+20 pts", status: "in-progress", color: "#63b3ff" },
-    { task: "Don't apply for new credit", impact: "+10 pts", status: "done", color: "#34d399" },
-    { task: "Check for report errors", impact: "+5 pts", status: "pending", color: "#fbbf24" },
-    { task: "Maintain old credit accounts", impact: "+8 pts", status: "done", color: "#34d399" },
-    { task: "Diversify credit mix", impact: "+12 pts", status: "in-progress", color: "#63b3ff" },
+    { id: 1, task: "Pay credit card bills on time", impact: "+15 pts", status: "pending", color: "#fbbf24", category: "Payment History" },
+    { id: 2, task: "Reduce credit utilization to <30%", impact: "+20 pts", status: "in-progress", color: "#63b3ff", category: "Credit Utilization" },
+    { id: 3, task: "Don't apply for new credit", impact: "+10 pts", status: "done", color: "#34d399", category: "Credit Inquiries" },
+    { id: 4, task: "Check for report errors", impact: "+5 pts", status: "pending", color: "#fbbf24", category: "Report Accuracy" },
+    { id: 5, task: "Maintain old credit accounts", impact: "+8 pts", status: "done", color: "#34d399", category: "Credit History" },
+    { id: 6, task: "Diversify credit mix", impact: "+12 pts", status: "in-progress", color: "#63b3ff", category: "Credit Mix" },
   ];
+
+  const generateAIInsights = () => {
+    const insights = [
+      `Based on your current score of ${currentScore}, you're in the ${currentScore >= 750 ? 'Excellent' : currentScore >= 700 ? 'Good' : 'Fair'} range.`,
+      `Your payment history accounts for 35% of your score. Focus on timely payments for maximum impact.`,
+      `Credit utilization is 30% of your score. Reducing it below 30% can boost your score by 20+ points.`,
+      `The average time to reach ${targetScore} from ${currentScore} is ${Math.ceil((targetScore - currentScore) / 15)} months with consistent effort.`,
+      `Your credit age is ${Math.floor(Math.random() * 10) + 3} years. Keep old accounts open to maintain history.`
+    ];
+    setAiInsights(insights);
+  };
+
+  const simulateScoreImprovement = (actionId) => {
+    const action = actions.find(a => a.id === actionId);
+    if (action && !completedActions.includes(actionId)) {
+      const impact = parseInt(action.impact.match(/\d+/)[0]);
+      setCurrentScore(prev => Math.min(prev + impact, maxScore));
+      setCompletedActions(prev => [...prev, actionId]);
+      setSelectedAction(null);
+    }
+  };
 
   return (
     <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:32 }}>
@@ -3783,6 +3891,149 @@ function CreditScore({ user }) {
               </div>
               <div style={{ fontSize:10, padding:"4px 10px", borderRadius:20, background:`${a.color}20`, color:a.color, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em" }}>
                 {a.status === "done" ? "✓" : a.status === "in-progress" ? "⟳" : "○"}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Interactive AI Insights & Simulation */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))", gap:24 }}>
+        {/* AI Insights Panel */}
+        <div style={{ 
+          padding:20, 
+          background:"rgba(99,179,255,0.08)", 
+          border:"1px solid rgba(99,179,255,0.2)", 
+          borderRadius:12,
+          animation:"fadeIn 0.5s ease"
+        }}>
+          <div style={{ fontSize:14, fontWeight:700, color:"#63b3ff", marginBottom:12 }}>🤖 AI Insights</div>
+          <button onClick={generateAIInsights} style={{
+            padding:"8px 16px",
+            background:"linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))",
+            border:"1px solid rgba(99,179,255,0.3)",
+            borderRadius:8,
+            color:"#e2eaff",
+            fontSize:12,
+            fontWeight:600,
+            cursor:"pointer",
+            marginBottom:16
+          }}>
+            🧠 Generate AI Analysis
+          </button>
+          {aiInsights.length > 0 && (
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {aiInsights.map((insight, idx) => (
+                <div key={idx} style={{
+                  padding:12,
+                  background:"rgba(15,23,42,0.1)",
+                  borderRadius:8,
+                  fontSize:11,
+                  color:"rgba(226,234,255,0.8)",
+                  lineHeight:1.5,
+                  borderLeft:"3px solid #63b3ff"
+                }}>
+                  {insight}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Simulation Controls */}
+        <div style={{ 
+          padding:20, 
+          background:"rgba(52,211,153,0.08)", 
+          border:"1px solid rgba(52,211,153,0.2)", 
+          borderRadius:12,
+          animation:"fadeIn 0.5s ease 0.2s both"
+        }}>
+          <div style={{ fontSize:14, fontWeight:700, color:"#34d399", marginBottom:12 }}>🎯 Score Simulator</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <label style={{ fontSize:12, color:"rgba(226,234,255,0.7)" }}>Target Score:</label>
+              <input 
+                type="range" 
+                min="700" 
+                max="900" 
+                value={targetScore} 
+                onChange={e=>setTargetScore(Number(e.target.value))}
+                style={{ flex:1 }}
+              />
+              <span style={{ fontSize:14, fontWeight:700, color:"#34d399", minWidth:40 }}>{targetScore}</span>
+            </div>
+            <button onClick={() => setSimulationMode(!simulationMode)} style={{
+              padding:"8px 16px",
+              background: simulationMode ? "rgba(239,68,68,0.2)" : "rgba(52,211,153,0.2)",
+              border: simulationMode ? "1px solid rgba(239,68,68,0.3)" : "1px solid rgba(52,211,153,0.3)",
+              borderRadius:8,
+              color: simulationMode ? "#f87171" : "#34d399",
+              fontSize:12,
+              fontWeight:600,
+              cursor:"pointer"
+            }}>
+              {simulationMode ? "🛑 Stop Simulation" : "▶️ Start Simulation"}
+            </button>
+            {simulationMode && (
+              <div style={{ fontSize:11, color:"rgba(226,234,255,0.6)" }}>
+                Click on actions below to simulate score improvements!
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Enhanced Interactive Actions */}
+      <div>
+        <div style={{ fontWeight:700, fontSize:14, marginBottom:16 }}>🎯 Interactive Action Plan</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:12 }}>
+          {actions.map(action => (
+            <div 
+              key={action.id}
+              onClick={() => simulationMode && simulateScoreImprovement(action.id)}
+              style={{
+                padding:16,
+                background: completedActions.includes(action.id) 
+                  ? "rgba(52,211,153,0.1)" 
+                  : selectedAction === action.id 
+                    ? "rgba(99,179,255,0.15)" 
+                    : "rgba(255,255,255,0.02)",
+                border: completedActions.includes(action.id)
+                  ? "1px solid rgba(52,211,153,0.3)"
+                  : selectedAction === action.id
+                    ? "1px solid rgba(99,179,255,0.4)"
+                    : "1px solid rgba(255,255,255,0.08)",
+                borderRadius:10,
+                cursor: simulationMode && !completedActions.includes(action.id) ? "pointer" : "default",
+                transition:"all 0.3s ease",
+                opacity: completedActions.includes(action.id) ? 0.7 : 1
+              }}
+            >
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                <span style={{ fontSize:12, color:action.color, fontWeight:600 }}>{action.category}</span>
+                <span style={{ 
+                  fontSize:11, 
+                  fontWeight:700, 
+                  color: completedActions.includes(action.id) ? "#34d399" : action.color 
+                }}>
+                  {completedActions.includes(action.id) ? "✅ Completed" : action.impact}
+                </span>
+              </div>
+              <div style={{ fontSize:13, color:"#e2eaff", marginBottom:8 }}>{action.task}</div>
+              <div style={{ 
+                height:4, 
+                background: completedActions.includes(action.id) 
+                  ? "#34d399" 
+                  : "rgba(255,255,255,0.1)", 
+                borderRadius:2,
+                overflow:"hidden"
+              }}>
+                <div style={{
+                  width: completedActions.includes(action.id) ? "100%" : "0%",
+                  height:"100%",
+                  background: action.color,
+                  transition: completedActions.includes(action.id) ? "width 0.5s ease" : "none"
+                }} />
               </div>
             </div>
           ))}
