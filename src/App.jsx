@@ -930,7 +930,7 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
           FINANCIAL OVERVIEW · <span style={{ animation:"blink 1.2s step-end infinite" }}>●</span> LIVE
         </div>
         <div className="hero-name" style={{ fontSize:34, fontWeight:800, lineHeight:1.1 }}>
-          Welcome back, <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{user.name.split(" ")[0]}</span>
+          Welcome back, <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{user.name}</span>
         </div>
       </div>
 
@@ -1579,50 +1579,50 @@ function AskAstro({ updates, customerProfile }) {
   const translateText = (text, targetLang) => {
     const translations = {
       mr: {
-        "Hi {userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.": 
-          "\u0928\u092e\u0938\u094d\u0915\u093e\u0930 {userName}! \u092e\u0940 \u0906\u0938\u094d\u091f\u094d\u0930\u094b \u0906\u0939\u0947, \u0924\u0941\u092e\u091a\u094d\u092f\u093e \u092b\u093f\u0928\u092a\u093e\u092f\u0932\u091f \u090f\u0906\u090f \u0938\u0939-\u092a\u093e\u092f\u0932\u091f. \u092e\u0932\u093e \u0924\u0941\u092e\u091a\u094d\u092f\u093e \u0915\u0930\u094d\u091c\u093e\u0902\u092c\u0926\u094d\u0926\u0932, \u091c\u094b\u0916\u092e \u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932\u092c\u0926\u094d\u0926\u0932, \u092b\u0938\u0935\u0923\u0941\u0915\u0940 \u0938\u0942\u091a\u0928\u093e\u0902\u092c\u0926\u094d\u0926\u0932, \u0915\u093f\u0902\u0935\u093e \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915 \u0927\u094b\u0930\u0923\u093e\u092c\u0926\u094d\u0926\u0932 \u0935\u093f\u091a\u093e\u0930\u093e.",
+        "Hi {userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.":
+          "नमस्कार {userName}! मी ॲस्ट्रो आहे, तुमचा फिनपायलट एआय सहकारी. मला तुमच्या कर्ज, जोखीम प्रोफाइल, फसवणूक सूचना किंवा गुंतवणूक धोरणाबद्दल विचारा.",
         "Based on your current EMI of ₹{amount} and income of ₹{income}, I recommend the following investment strategy:": 
-          "\u0924\u0941\u092e\u091a\u094d\u092f\u093e \u0938\u0927\u094d\u092f\u093e\u091a\u094d\u092f\u093e \u20b9{amount} \u0908\u090f\u092e\u0906\u090f \u0906\u0923\u093f \u20b9{income} \u0909\u0924\u094d\u092a\u0928\u094d\u0928\u093e\u0935\u0930 \u0906\u0927\u093e\u0930\u093f\u0924, \u092e\u0940 \u0916\u093e\u0932\u0940\u0932 \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915 \u0927\u094b\u0930\u0923 \u0936\u093f\u092b\u093e\u0930\u0938 \u0915\u0930\u0924\u094b:",
-        "Emergency Fund": "\u0906\u092a\u0924\u094d\u0915\u093e\u0932\u0940\u0928 \u0928\u093f\u0927\u0940",
-        "SIP Investment": "\u090f\u0938\u0906\u090f\u092a\u0940 \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915",
-        "Debt Repayment": "\u0915\u0930\u094d\u091c \u092a\u0930\u0924\u092b\u0947\u0921",
-        "Long-term Growth": "\u0926\u0940\u0930\u094d\u0918\u0915\u093e\u0932\u0940\u0928 \u0935\u093e\u0922",
-        "I couldn't generate a response yet. Please try once more.": "\u092e\u0940 \u0905\u091c\u0942\u0928 \u092a\u094d\u0930\u0924\u093f\u0938\u093e\u0926 \u0924\u092f\u093e\u0930 \u0915\u0930\u0942 \u0936\u0915\u0932\u094b \u0928\u093e\u0939\u0940. \u0915\u0943\u092a\u092f\u093e \u090f\u0915\u0926\u093e \u092a\u0941\u0928\u094d\u0939\u093e \u092a\u094d\u0930\u092f\u0924\u094d\u0928 \u0915\u0930\u093e.",
-        "Scan Passbook": "\u092a\u093e\u0938\u094d\u0916\u092a\u0941\u0938\u094d\u0924\u0915 \u0938\u094d\u0915\u0945\u0928 \u0915\u0930\u093e",
-        "Camera": "\u0915\u0945\u092e\u0930\u093e",
-        "UPI Transfer": "\u092f\u0942\u092a\u0940 \u0939\u0938\u094d\u0924\u093e\u0902\u0924\u0930",
-        "Salary Credit": "\u092a\u0917\u093e\u0930 \u0915\u094d\u0930\u0947\u0921\u093f\u091f",
-        "Online Shopping": "\u0911\u0928\u0932\u093e\u0907\u0928 \u0936\u0949\u092a\u093f\u0902\u0917",
-        "Electric Bill": "\u0935\u0940\u091c\u092a\u093e\u0923\u094d\u092f\u093e\u091a\u093e \u092c\u093f\u0932",
-        "Current Balance": "\u0938\u0926\u094d\u092f \u0936\u093f\u0932\u094d\u0932\u0915",
-        "Last Transaction": "\u0905\u0902\u0924\u093f\u092e \u0935\u094d\u092f\u0935\u0939\u093e\u0930",
-        "Recent Transactions": "\u0905\u0926\u094d\u092f \u0935\u094d\u092f\u0935\u0939\u093e\u0930",
-        "Account Summary": "\u0916\u093e\u0924\u094d\u092f\u0947\u091a\u093e \u0906\u0932\u093e\u0935",
-        "Send": "\u092a\u093e\u0920\u0935\u093e",
-        "Ask about loans, risk, fraud, investments…": "\u0915\u0930\u094d\u091c\u093e\u0902\u092c\u0926\u094d\u0926\u0932, \u091c\u094b\u0916\u092e, \u092b\u0938\u0935\u0923\u0941\u0915\u0940, \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915 \u092b\u0926\u094d\u0926\u0932\u0932\u093e \u0935\u093f\u091c\u093e\u0930\u093e…"
+          "तुमच्या सध्याच्या ₹{amount} ईएमआय आणि ₹{income} उत्पन्नावर आधारित, मी खालील गुंतवणूक धोरणाची शिफारस करतो:",
+        "Emergency Fund": "आपत्कालीन निधी",
+        "SIP Investment": "एसआयपी गुंतवणूक",
+        "Debt Repayment": "कर्ज परतफेड",
+        "Long-term Growth": "दीर्घकालीन वाढ",
+        "I couldn't generate a response yet. Please try once more.": "मी अद्याप प्रतिसाद तयार करू शकलो नाही. कृपया पुन्हा एकदा प्रयत्न करा.",
+        "Scan Passbook": "पासबुक स्कॅन करा",
+        "Camera": "कॅमेरा",
+        "UPI Transfer": "यूपीआय हस्तांतरण",
+        "Salary Credit": "पगार क्रेडिट",
+        "Online Shopping": "ऑनलाइन शॉपिंग",
+        "Electric Bill": "वीज बिल",
+        "Current Balance": "सध्याची शिल्लक",
+        "Last Transaction": "अंतिम व्यवहार",
+        "Recent Transactions": "अलीकडील व्यवहार",
+        "Account Summary": "खाते सारांश",
+        "Send": "पाठवा",
+        "Ask about loans, risk, fraud, investments…": "कर्ज, जोखीम, फसवणूक, गुंतवणुकीबद्दल विचारा…"
       },
       hi: {
-        "Hi {userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.": 
-          "\u0928\u092e\u0938\u094d\u0924\u0947 {userName}! \u092e\u0948\u0902 \u0906\u0938\u094d\u091f\u094d\u0930\u094b \u0939\u0942\u0902, \u0906\u092a\u0915\u093e \u092b\u093f\u0928\u092a\u093e\u092f\u0932\u091f \u090f\u0906\u0908 \u0938\u0939-\u092a\u093e\u092f\u0932\u091f\u0964 \u092e\u0941\u091d\u0938\u0947 \u0905\u092a\u0928\u0947 \u0923\u0923\u094b\u0902, \u091c\u094b\u0916\u093f\u092e \u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932, \u0927\u094b\u0916\u093e\u0927\u0921\u093c\u0940 \u0905\u0932\u0930\u094d\u091f, \u092f\u093e \u0928\u093f\u0935\u0947\u0936 \u0930\u0923\u0928\u0940\u0924\u093f \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092a\u0942\u091b\u0947\u0902\u0964",
+        "Hi {userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.":
+          "नमस्ते {userName}! मैं एस्ट्रो हूं, आपका फिनपायलट एआई सह-पायलट। मुझसे अपने ऋण, जोखिम प्रोफाइल, धोखाधड़ी अलर्ट, या निवेश रणनीति के बारे में पूछें।",
         "Based on your current EMI of ₹{amount} and income of ₹{income}, I recommend the following investment strategy:": 
-          "\u0906\u092a\u0915\u0947 \u0935\u0930\u094d\u0924\u092e\u093e\u0928 \u20b9{amount} \u0908\u090f\u092e\u0906\u0908 \u0914\u0930 \u20b9{income} \u0906\u092f \u0915\u0947 \u0906\u0927\u093e\u0930 \u092a\u0930, \u092e\u0948\u0902 \u0928\u093f\u092e\u094d\u0928\u0932\u093f\u0915\u093f\u0924 \u0928\u093f\u0935\u0947\u0936 \u0930\u0923\u0928\u0940\u0924\u093f \u0915\u0940 \u0905\u0928\u0941\u0936\u0902\u0938\u093e \u0915\u0930\u0924\u093e \u0939\u0942\u0902:",
-        "Emergency Fund": "\u0906\u092a\u093a\u0924\u0915\u093e\u0932\u0940\u0928 \u0915\u094b\u0937",
-        "SIP Investment": "\u090f\u0938\u0906\u0908\u092a\u0940 \u0928\u093f\u0935\u0947\u0936",
-        "Debt Repayment": "\u0915\u0930\u094d\u091c \u091a\u0941\u0915\u094c\u0924\u0940",
-        "Long-term Growth": "\u0926\u0940\u0930\u094d\u0918\u0915\u093e\u0932\u093f\u0915 \u0935\u093f\u0915\u093e\u0938",
-        "I couldn't generate a response yet. Please try once more.": "\u092e\u0948\u0902 \u0905\u092ad\u0940 \u0924\u0915 \u092a\u094d\u0930\u0924\u093f\u0915\u094d\u0930\u093f\u092f\u093e \u0928\u0939\u0940\u0902 \u0926\u0947 \u0938\u0915\u093e\u0964 \u0915\u0943\u092a\u092f\u093e \u090f\u0915 \u092c\u093e\u0930 \u092b\u093f\u0930 \u0938\u0947 \u092a\u094d\u0930\u092f\u093e\u0938 \u0915\u0930\u0947\u0902\u0964",
-        "Scan Passbook": "\u092a\u093e\u0938\u094d\u0916\u092c\u0941\u0915 \u0938\u094d\u0915\u0948\u0928 \u0915\u0930\u0947\u0902",
-        "Camera": "\u0915\u0948\u092e\u0930\u093e",
-        "UPI Transfer": "\u092f\u0942\u092a\u0940 \u091f\u094d\u0930\u093e\u0902\u0938\u092b\u0930",
-        "Salary Credit": "\u0938\u0948\u0932\u0930\u0940 \u0915\u094d\u0930\u0947\u0921\u093f\u091f",
-        "Online Shopping": "\u0911\u0928\u0932\u093e\u0907\u0928 \u0936\u0949\u092a\u093f\u0902\u0917",
-        "Electric Bill": "\u092c\u093f\u091c\u094d\u091c\u0940 \u092c\u093f\u0932",
-        "Current Balance": "\u0935\u0930\u094d\u0924\u092e\u093e\u0928 \u0936\u0947\u0937",
-        "Last Transaction": "\u0905\u0902\u0924\u093f\u092e \u0932\u0947\u0928\u0926\u0947\u0928",
-        "Recent Transactions": "\u0939\u093e\u0932 \u0915\u0940 \u0932\u0947\u0928\u0926\u0947\u0902",
-        "Account Summary": "\u0916\u093e\u0924\u0947 \u0915\u093e \u0938\u093a\u0930\u093e\u0902\u0936",
-        "Send": "\u092d\u0947\u091c\u0947\u0902",
-        "Ask about loans, risk, fraud, investments…": "\u0915\u0930\u094d\u091c\u094b\u0902, \u091c\u094b\u0916\u092e, \u0927\u094b\u0916\u093e\u0927\u0921\u093c\u0940, \u0928\u093f\u0935\u0947\u0936\u094b\u0902 \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092a\u0942\u091b\u0947\u0902…"
+          "आपके वर्तमान ₹{amount} ईएमआय और ₹{income} आय के आधार पर, मैं निम्नलिखित निवेश रणनीति की सिफारिश करता हूं:",
+        "Emergency Fund": "आपातकालीन निधि",
+        "SIP Investment": "एसआईपी निवेश",
+        "Debt Repayment": "ऋण चुकौती",
+        "Long-term Growth": "दीर्घकालिक विकास",
+        "I couldn't generate a response yet. Please try once more.": "मैं अभी तक प्रतिक्रिया उत्पन्न नहीं कर सका। कृपया एक बार फिर प्रयास करें।",
+        "Scan Passbook": "पासबुक स्कैन करें",
+        "Camera": "कैमरा",
+        "UPI Transfer": "यूपीआई ट्रांसफर",
+        "Salary Credit": "वेतन क्रेडिट",
+        "Online Shopping": "ऑनलाइन शॉपिंग",
+        "Electric Bill": "बिजली का बिल",
+        "Current Balance": "वर्तमान शेष",
+        "Last Transaction": "अंतिम लेनदेन",
+        "Recent Transactions": "हाल के लेनदेन",
+        "Account Summary": "खाता सारांश",
+        "Send": "भेजें",
+        "Ask about loans, risk, fraud, investments…": "ऋण, जोखिम, धोखाधड़ी, निवेश के बारे में पूछें…"
       }
     };
     
@@ -2844,7 +2844,7 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
       )}
 
       {/* Tab Content */}
-      {activeTab === "overview" && (
+      {isAuthenticated && activeTab === "overview" && (
         <div style={{
           clipPath:"polygon(4% 0, 96% 0, 100% 12%, 100% 88%, 96% 100%, 4% 100%, 0 88%, 0 12%)",
           border:"1px solid rgba(99,179,255,0.25)",
@@ -2883,7 +2883,7 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
       )}
 
       {/* AI Recommendations Tab */}
-      {activeTab === "recommendations" && aiRecommendations.length > 0 && (
+      {isAuthenticated && activeTab === "recommendations" && aiRecommendations.length > 0 && (
         <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
           <div style={{ fontSize:14, fontWeight:700, color:"#a78bfa" }}>🤖 AI-Powered Product Recommendations</div>
           {aiRecommendations.map((rec, idx) => (
@@ -2921,7 +2921,7 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
       )}
 
       {/* Customer Journey Tab */}
-      {activeTab === "journey" && customerJourney.length > 0 && (
+      {isAuthenticated && activeTab === "journey" && customerJourney.length > 0 && (
         <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
           <div style={{ fontSize:14, fontWeight:700, color:"#34d399" }}>🛤️ Customer Journey Timeline</div>
           <div style={{ position:"relative", paddingLeft:20 }}>
@@ -2944,7 +2944,7 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
       )}
 
       {/* Risk Analysis Tab */}
-      {activeTab === "risk" && riskAnalysis && (
+      {isAuthenticated && activeTab === "risk" && riskAnalysis && (
         <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
           <div style={{ fontSize:14, fontWeight:700, color:"#fbbf24" }}>⚠️ Comprehensive Risk Analysis</div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12 }}>
@@ -2982,7 +2982,7 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
       )}
       
       {/* Original Overview Content */}
-      {summary?.customer && (
+      {summary?.customer && activeTab === "overview" && (
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }} className="sphere-row">
           <FeatureShard title="Customer Snapshot" color="#63b3ff" items={Object.entries(summary.customer).map(([k,v]) => `${k}: ${v}`)} />
           <FeatureShard title="Decision Reasoning" color={summary.allowed ? "#34d399" : "#f87171"} items={[`${summary.allowed ? "Allowed" : "Blocked"}: ${summary.recommendation}`, summary.decisionExplainer || ""]} />
@@ -2997,7 +2997,7 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
         </select>
         <button onClick={getDecision} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"9px 14px", fontSize:12 }}>POST /rm/product-decision</button>
       </div>
-      {decision && <FeatureShard title="Decision Reasoning" color={decision.allowed ? "#34d399" : "#f87171"} items={[`${decision.allowed ? "Allowed" : "Blocked"}: ${decision.recommendation}`, `Why ${decision.allowed ? "allowed" : "blocked"}: ${decision.reason}`]} />}
+      {decision && <FeatureShard title="Decision Reasoning" color={decision.allowed ? "#34d399" : "#f87171"} items={[`${decision.allowed ? "Allowed" : "Blocked"}: ${decision.recommendation}`, `Why ${decision.allowed ? "blocked" : "allowed"}: ${decision.reason}`]} />}
     </div>
   );
 }
@@ -3029,9 +3029,7 @@ function PrivacyCompliance({ token, bankerToken }) {
     generateAdvancedComplianceData();
   };
 
-  // Generate Advanced Compliance Data
-  const generateAdvancedComplianceData = () => {
-    // Dynamic Masking Levels
+  // Dynamic Masking Levels
     const maskingLevels = [
       { level: "standard", description: "Basic data masking for all users", access: "Limited" },
       { level: "enhanced", description: "Senior RM access with additional data", access: "Extended" },
@@ -4265,7 +4263,13 @@ function CreditScore({ user }) {
   const [completedActions, setCompletedActions] = useState([]);
   const [aiInsights, setAiInsights] = useState([]);
   const [simulationMode, setSimulationMode] = useState(false);
-  
+  const [simulationData, setSimulationData] = useState({
+    utilization: 35,
+    onTimePayments: 95,
+    newInquiries: 2,
+  });
+  const [simulatedScore, setSimulatedScore] = useState(currentScore);
+
   const progress = (currentScore - 300) / (maxScore - 300);
   const targetProgress = (targetScore - 300) / (maxScore - 300);
 
@@ -4297,6 +4301,14 @@ function CreditScore({ user }) {
       setCompletedActions(prev => [...prev, actionId]);
       setSelectedAction(null);
     }
+  };
+
+  const runSimulation = () => {
+    let score = currentScore;
+    score += (35 - simulationData.utilization) * 2; // 2 points for each % reduction
+    score += (simulationData.onTimePayments - 95) * 1; // 1 point for each % increase
+    score -= simulationData.newInquiries * 5; // 5 points for each new inquiry
+    setSimulatedScore(Math.max(300, Math.min(score, 900)));
   };
 
   return (
@@ -4332,7 +4344,7 @@ function CreditScore({ user }) {
           {/* Score display */}
           <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-30%)", textAlign:"center" }}>
             <div style={{ fontSize:54, fontWeight:800, fontFamily:"'JetBrains Mono', monospace", background:"linear-gradient(135deg,#fbbf24,#34d399)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", lineHeight:1 }}>
-              {currentScore}
+              {simulationMode ? simulatedScore : currentScore}
             </div>
             <div style={{ fontSize:11, color:"rgba(226,234,255,0.4)", marginTop:4, textTransform:"uppercase", letterSpacing:"0.1em" }}>
               Target: {targetScore}
@@ -4427,7 +4439,7 @@ function CreditScore({ user }) {
               />
               <span style={{ fontSize:14, fontWeight:700, color:"#34d399", minWidth:40 }}>{targetScore}</span>
             </div>
-            <button onClick={() => setSimulationMode(!simulationMode)} style={{
+            <button onClick={() => {setSimulationMode(!simulationMode); if (!simulationMode) runSimulation(); else setSimulatedScore(currentScore);}} style={{
               padding:"8px 16px",
               background: simulationMode ? "rgba(239,68,68,0.2)" : "rgba(52,211,153,0.2)",
               border: simulationMode ? "1px solid rgba(239,68,68,0.3)" : "1px solid rgba(52,211,153,0.3)",
@@ -4441,7 +4453,27 @@ function CreditScore({ user }) {
             </button>
             {simulationMode && (
               <div style={{ fontSize:11, color:"rgba(226,234,255,0.6)" }}>
-                Click on actions below to simulate score improvements!
+                Adjust the sliders below to see the impact on your score.
+                <div style={{ display:"flex", flexDirection:"column", gap:12, marginTop:12 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <label style={{ fontSize:12, color:"rgba(226,234,255,0.7)", width:120 }}>Utilization:</label>
+                    <input type="range" min="0" max="100" value={simulationData.utilization} onChange={e=>setSimulationData(d => ({...d, utilization: Number(e.target.value)}))} style={{ flex:1 }} />
+                    <span style={{ fontSize:14, fontWeight:700, color:"#34d399", minWidth:40 }}>{simulationData.utilization}%</span>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <label style={{ fontSize:12, color:"rgba(226,234,255,0.7)", width:120 }}>On-time Payments:</label>
+                    <input type="range" min="80" max="100" value={simulationData.onTimePayments} onChange={e=>setSimulationData(d => ({...d, onTimePayments: Number(e.target.value)}))} style={{ flex:1 }} />
+                    <span style={{ fontSize:14, fontWeight:700, color:"#34d399", minWidth:40 }}>{simulationData.onTimePayments}%</span>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <label style={{ fontSize:12, color:"rgba(226,234,255,0.7)", width:120 }}>New Inquiries:</label>
+                    <input type="range" min="0" max="10" value={simulationData.newInquiries} onChange={e=>setSimulationData(d => ({...d, newInquiries: Number(e.target.value)}))} style={{ flex:1 }} />
+                    <span style={{ fontSize:14, fontWeight:700, color:"#34d399", minWidth:40 }}>{simulationData.newInquiries}</span>
+                  </div>
+                  <button onClick={runSimulation} style={{padding:"8px 16px", background:"rgba(52,211,153,0.2)", border:"1px solid rgba(52,211,153,0.3)", borderRadius:8, color:"#34d399", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                    Run Simulation
+                  </button>
+                </div>
               </div>
             )}
           </div>
