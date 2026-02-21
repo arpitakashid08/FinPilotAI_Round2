@@ -2152,14 +2152,20 @@ function App() {
   const mobile = useIsMobile();
 
   useEffect(() => {
+    // Check for existing session
     const saved = localStorage.getItem("fp_token");
-    if (saved) setToken(saved);
     const savedBanker = localStorage.getItem("fp_banker_token");
-    if (savedBanker) setBankerToken(savedBanker);
-    loadInitialData();
+    
+    if (saved) {
+      setToken(saved);
+      if (savedBanker) setBankerToken(savedBanker);
+      setIntroDone(true); // Skip intro if already logged in
+      loadInitialData();
+    }
   }, []);
 
   const loadInitialData = async () => {
+    if (!token) return;
     const [profileData, updatesData, modulesData] = await Promise.all([
       api.getProfile(token),
       api.getUpdates(),
@@ -2188,7 +2194,13 @@ function App() {
   };
 
   if (!introDone) return <Intro onDone={() => setIntroDone(true)} />;
-  if (!token) return authView === "login" ? <Login onSuccess={(data) => { setToken(data.token); setBankerToken(data.bankerToken); }} goSignup={() => setAuthView("signup")} /> : <Signup goLogin={() => setAuthView("login")} />;
+  if (!token) return authView === "login" ? <Login onSuccess={(data) => { 
+    setToken(data.token); 
+    setBankerToken(data.bankerToken); 
+    localStorage.setItem("fp_token", data.token);
+    localStorage.setItem("fp_banker_token", data.bankerToken);
+    loadInitialData();
+  }} goSignup={() => setAuthView("signup")} /> : <Signup goLogin={() => setAuthView("login")} />;
 
   return (
     <>
