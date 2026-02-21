@@ -3003,7 +3003,14 @@ function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, 
 }
 
 function PrivacyCompliance({ token, bankerToken }) {
-  const [data, setData] = useState(fallbackCompliance);
+  const [data, setData] = useState({
+    role: "user",
+    consentStatus: "Active",
+    dataUsed: ["Income", "Spending trend", "Loan burden", "Credit score", "Risk profile"],
+    badges: ["GDPR Compliant", "Data Encrypted", "Audit Ready"],
+    maskedPreview: { email: "us***@j", document: "ac****2", mobile: "98****0" },
+    decisionExplainer: "AI-driven decision engine with explainable factors and regulatory compliance checks."
+  });
   const [dynamicMasking, setDynamicMasking] = useState("standard");
   const [consentManagement, setConsentManagement] = useState([]);
   const [auditStreams, setAuditStreams] = useState([]);
