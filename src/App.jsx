@@ -1587,18 +1587,42 @@ function AskAstro({ updates, customerProfile }) {
         "SIP Investment": "\u090f\u0938\u0906\u090f\u092a\u0940 \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915",
         "Debt Repayment": "\u0915\u0930\u094d\u091c \u092a\u0930\u0924\u092b\u0947\u0921",
         "Long-term Growth": "\u0926\u0940\u0930\u094d\u0918\u0915\u093e\u0932\u0940\u0928 \u0935\u093e\u0922",
-        "I couldn't generate a response yet. Please try once more.": "\u092e\u0940 \u0905\u091c\u0942\u0928 \u092a\u094d\u0930\u0924\u093f\u0938\u093e\u0926 \u0924\u092f\u093e\u0930 \u0915\u0930\u0942 \u0936\u0915\u0932\u094b \u0928\u093e\u0939\u0940. \u0915\u0943\u092a\u092f\u093e \u090f\u0915\u0926\u093e \u092a\u0941\u0928\u094d\u0939\u093e \u092a\u094d\u0930\u092f\u0924\u094d\u0928 \u0915\u0930\u093e."
+        "I couldn't generate a response yet. Please try once more.": "\u092e\u0940 \u0905\u091c\u0942\u0928 \u092a\u094d\u0930\u0924\u093f\u0938\u093e\u0926 \u0924\u092f\u093e\u0930 \u0915\u0930\u0942 \u0936\u0915\u0932\u094b \u0928\u093e\u0939\u0940. \u0915\u0943\u092a\u092f\u093e \u090f\u0915\u0926\u093e \u092a\u0941\u0928\u094d\u0939\u093e \u092a\u094d\u0930\u092f\u0924\u094d\u0928 \u0915\u0930\u093e.",
+        "Scan Passbook": "\u092a\u093e\u0938\u094d\u0916\u092a\u0941\u0938\u094d\u0924\u0915 \u0938\u094d\u0915\u0945\u0928 \u0915\u0930\u093e",
+        "Camera": "\u0915\u0945\u092e\u0930\u093e",
+        "UPI Transfer": "\u092f\u0942\u092a\u0940 \u0939\u0938\u094d\u0924\u093e\u0902\u0924\u0930",
+        "Salary Credit": "\u092a\u0917\u093e\u0930 \u0915\u094d\u0930\u0947\u0921\u093f\u091f",
+        "Online Shopping": "\u0911\u0928\u0932\u093e\u0907\u0928 \u0936\u0949\u092a\u093f\u0902\u0917",
+        "Electric Bill": "\u0935\u0940\u091c\u092a\u093e\u0923\u094d\u092f\u093e\u091a\u093e \u092c\u093f\u0932",
+        "Current Balance": "\u0938\u0926\u094d\u092f \u0936\u093f\u0932\u094d\u0932\u0915",
+        "Last Transaction": "\u0905\u0902\u0924\u093f\u092e \u0935\u094d\u092f\u0935\u0939\u093e\u0930",
+        "Recent Transactions": "\u0905\u0926\u094d\u092f \u0935\u094d\u092f\u0935\u0939\u093e\u0930",
+        "Account Summary": "\u0916\u093e\u0924\u094d\u092f\u0947\u091a\u093e \u0906\u0932\u093e\u0935",
+        "Send": "\u092a\u093e\u0920\u0935\u093e",
+        "Ask about loans, risk, fraud, investments…": "\u0915\u0930\u094d\u091c\u093e\u0902\u092c\u0926\u094d\u0926\u0932, \u091c\u094b\u0916\u092e, \u092b\u0938\u0935\u0923\u0941\u0915\u0940, \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915 \u092b\u0926\u094d\u0926\u0932\u0932\u093e \u0935\u093f\u091c\u093e\u0930\u093e…"
       },
       hi: {
         "Hi {userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.": 
           "\u0928\u092e\u0938\u094d\u0924\u0947 {userName}! \u092e\u0948\u0902 \u0906\u0938\u094d\u091f\u094d\u0930\u094b \u0939\u0942\u0902, \u0906\u092a\u0915\u093e \u092b\u093f\u0928\u092a\u093e\u092f\u0932\u091f \u090f\u0906\u0908 \u0938\u0939-\u092a\u093e\u092f\u0932\u091f\u0964 \u092e\u0941\u091d\u0938\u0947 \u0905\u092a\u0928\u0947 \u0923\u0923\u094b\u0902, \u091c\u094b\u0916\u093f\u092e \u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932, \u0927\u094b\u0916\u093e\u0927\u0921\u093c\u0940 \u0905\u0932\u0930\u094d\u091f, \u092f\u093e \u0928\u093f\u0935\u0947\u0936 \u0930\u0923\u0928\u0940\u0924\u093f \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092a\u0942\u091b\u0947\u0902\u0964",
         "Based on your current EMI of ₹{amount} and income of ₹{income}, I recommend the following investment strategy:": 
-          "\u0906\u092a\u0915\u0947 \u0935\u0930\u094d\u0924\u092e\u093e\u0928 \u20b9{amount} \u0908\u090f\u092e\u0906\u0908 \u0914\u0930 \u20b9{income} \u0906\u092f \u0915\u0947 \u0906\u0927\u093e\u0930 \u092a\u0930, \u092e\u0948\u0902 \u0928\u093f\u092e\u094d\u0928\u0932\u093f\u0916\u093f\u0924 \u0928\u093f\u0935\u0947\u0936 \u0930\u0923\u0928\u0940\u0924\u093f \u0915\u0940 \u0905\u0928\u0941\u0936\u0902\u0938\u093e \u0915\u0930\u0924\u093e \u0939\u0942\u0902:",
-        "Emergency Fund": "\u0906\u092a\u093e\u0924\u0915\u093e\u0932\u0940\u0928 \u0915\u094b\u0937",
+          "\u0906\u092a\u0915\u0947 \u0935\u0930\u094d\u0924\u092e\u093e\u0928 \u20b9{amount} \u0908\u090f\u092e\u0906\u0908 \u0914\u0930 \u20b9{income} \u0906\u092f \u0915\u0947 \u0906\u0927\u093e\u0930 \u092a\u0930, \u092e\u0948\u0902 \u0928\u093f\u092e\u094d\u0928\u0932\u093f\u0915\u093f\u0924 \u0928\u093f\u0935\u0947\u0936 \u0930\u0923\u0928\u0940\u0924\u093f \u0915\u0940 \u0905\u0928\u0941\u0936\u0902\u0938\u093e \u0915\u0930\u0924\u093e \u0939\u0942\u0902:",
+        "Emergency Fund": "\u0906\u092a\u093a\u0924\u0915\u093e\u0932\u0940\u0928 \u0915\u094b\u0937",
         "SIP Investment": "\u090f\u0938\u0906\u0908\u092a\u0940 \u0928\u093f\u0935\u0947\u0936",
         "Debt Repayment": "\u0915\u0930\u094d\u091c \u091a\u0941\u0915\u094c\u0924\u0940",
         "Long-term Growth": "\u0926\u0940\u0930\u094d\u0918\u0915\u093e\u0932\u093f\u0915 \u0935\u093f\u0915\u093e\u0938",
-        "I couldn't generate a response yet. Please try once more.": "\u092e\u0948\u0902 \u0905\u092d\u0940 \u0924\u0915 \u092a\u094d\u0930\u0924\u093f\u0915\u094d\u0930\u093f\u092f\u093e \u0928\u0939\u0940\u0902 \u0926\u0947 \u0938\u0915\u093e\u0964 \u0915\u0943\u092a\u092f\u093e \u090f\u0915 \u092c\u093e\u0930 \u092b\u093f\u0930 \u0938\u0947 \u092a\u094d\u0930\u092f\u093e\u0938 \u0915\u0930\u0947\u0902\u0964"
+        "I couldn't generate a response yet. Please try once more.": "\u092e\u0948\u0902 \u0905\u092ad\u0940 \u0924\u0915 \u092a\u094d\u0930\u0924\u093f\u0915\u094d\u0930\u093f\u092f\u093e \u0928\u0939\u0940\u0902 \u0926\u0947 \u0938\u0915\u093e\u0964 \u0915\u0943\u092a\u092f\u093e \u090f\u0915 \u092c\u093e\u0930 \u092b\u093f\u0930 \u0938\u0947 \u092a\u094d\u0930\u092f\u093e\u0938 \u0915\u0930\u0947\u0902\u0964",
+        "Scan Passbook": "\u092a\u093e\u0938\u094d\u0916\u092c\u0941\u0915 \u0938\u094d\u0915\u0948\u0928 \u0915\u0930\u0947\u0902",
+        "Camera": "\u0915\u0948\u092e\u0930\u093e",
+        "UPI Transfer": "\u092f\u0942\u092a\u0940 \u091f\u094d\u0930\u093e\u0902\u0938\u092b\u0930",
+        "Salary Credit": "\u0938\u0948\u0932\u0930\u0940 \u0915\u094d\u0930\u0947\u0921\u093f\u091f",
+        "Online Shopping": "\u0911\u0928\u0932\u093e\u0907\u0928 \u0936\u0949\u092a\u093f\u0902\u0917",
+        "Electric Bill": "\u092c\u093f\u091c\u094d\u091c\u0940 \u092c\u093f\u0932",
+        "Current Balance": "\u0935\u0930\u094d\u0924\u092e\u093e\u0928 \u0936\u0947\u0937",
+        "Last Transaction": "\u0905\u0902\u0924\u093f\u092e \u0932\u0947\u0928\u0926\u0947\u0928",
+        "Recent Transactions": "\u0939\u093e\u0932 \u0915\u0940 \u0932\u0947\u0928\u0926\u0947\u0902",
+        "Account Summary": "\u0916\u093e\u0924\u0947 \u0915\u093e \u0938\u093a\u0930\u093e\u0902\u0936",
+        "Send": "\u092d\u0947\u091c\u0947\u0902",
+        "Ask about loans, risk, fraud, investments…": "\u0915\u0930\u094d\u091c\u094b\u0902, \u091c\u094b\u0916\u092e, \u0927\u094b\u0916\u093e\u0927\u0921\u093c\u0940, \u0928\u093f\u0935\u0947\u0936\u094b\u0902 \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092a\u0942\u091b\u0947\u0902…"
       }
     };
     
@@ -1965,7 +1989,7 @@ function AskAstro({ updates, customerProfile }) {
 
         <div style={{ display:"flex", gap:mobile ? 6 : 8, flexWrap:"wrap", alignItems:"center" }}>
           <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
-            placeholder="Ask about loans, risk, fraud, investments…"
+            placeholder={translateText("Ask about loans, risk, fraud, investments…", lang)}
             className="glass-input"
             style={{ flex:1, minWidth:0, padding:mobile ? "10px 14px" : "13px 18px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:mobile ? 10 : 12, color:"#e2eaff", fontSize:mobile ? 13 : 14 }} />
           <button onClick={send} style={{
@@ -1979,7 +2003,7 @@ function AskAstro({ updates, customerProfile }) {
             cursor:"pointer",
             transition:"all 0.2s"
           }}>
-            Send
+            {translateText("Send", lang)}
           </button>
           
           {/* Bank Selection & Scan Passbook */}
@@ -2009,7 +2033,7 @@ function AskAstro({ updates, customerProfile }) {
                 { date: "2026-02-17", desc: "Electric Bill", amount: -850, balance: 5399 }
               ];
               setBankSnap({ bank, balance: 45600, lastTransaction: "UPI Transfer to John", transactions });
-              setScanMsg(`✅ ${bank} passbook scanned successfully! Latest balance: ₹45,600`);
+              setScanMsg(translateText(`✅ ${bank} passbook scanned successfully! Latest balance: ₹45,600`, lang));
             }, 2000);
           }} style={{
             padding:mobile ? "8px 12px" : "10px 14px",
@@ -2022,19 +2046,43 @@ function AskAstro({ updates, customerProfile }) {
             cursor:"pointer",
             transition:"all 0.2s"
           }}>
-            📷 Scan Passbook
+            📷 {translateText("Scan Passbook", lang)}
+          </button>
+          
+          <button onClick={() => {
+            document.getElementById('passbook-camera-input').click();
+          }} style={{
+            padding:mobile ? "8px 12px" : "10px 14px",
+            background:"linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))",
+            border:"1px solid rgba(99,179,255,0.3)",
+            borderRadius:mobile ? 8 : 10,
+            color:"#e2eaff",
+            fontSize:mobile ? 11 : 12,
+            fontWeight:600,
+            cursor:"pointer",
+            transition:"all 0.2s"
+          }}>
+            📸 {translateText("Camera", lang)}
           </button>
           
           <input
+            id="passbook-camera-input"
             type="file"
             accept="image/*"
             capture="environment"
             style={{ display:"none" }}
             onChange={e=>{
               if (!e.target.files?.length) return;
-              setScanMsg("🔍 Processing passbook image...");
+              setScanMsg(translateText("🔍 Processing passbook image...", lang));
               setTimeout(() => {
-                setScanMsg(`✅ Passbook processed! Account: ${bank} | Balance: ₹45,600 | Last: UPI Transfer`);
+                const transactions = [
+                  { date: "2026-02-20", desc: translateText("UPI Transfer", lang), amount: -2500, balance: 45600 },
+                  { date: "2026-02-19", desc: translateText("Salary Credit", lang), amount: 52000, balance: 48100 },
+                  { date: "2026-02-18", desc: translateText("Online Shopping", lang), amount: -1299, balance: 4100 },
+                  { date: "2026-02-17", desc: translateText("Electric Bill", lang), amount: -850, balance: 5399 }
+                ];
+                setBankSnap({ bank, balance: 45600, lastTransaction: translateText("UPI Transfer", lang), transactions });
+                setScanMsg(translateText(`✅ Passbook processed! Account: ${bank} | Balance: ₹45,600 | Last: UPI Transfer`, lang));
               }, 1500);
             }}
           />
@@ -2053,21 +2101,21 @@ function AskAstro({ updates, customerProfile }) {
             animation:"fadeIn 0.3s ease"
           }}>
             <div style={{ fontSize:14, fontWeight:700, color:"#63b3ff", marginBottom:12 }}>
-              📊 {bankSnap.bank} Account Summary
+              📊 {translateText("Account Summary", lang)} - {bankSnap.bank}
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12, marginBottom:16 }}>
               <div style={{ padding:12, background:"rgba(99,179,255,0.1)", borderRadius:8, border:"1px solid rgba(99,179,255,0.2)" }}>
-                <div style={{ fontSize:11, color:"rgba(226,234,255,0.6)", marginBottom:4 }}>Current Balance</div>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.6)", marginBottom:4 }}>{translateText("Current Balance", lang)}</div>
                 <div style={{ fontSize:20, fontWeight:700, color:"#63b3ff" }}>₹{bankSnap.balance.toLocaleString("en-IN")}</div>
               </div>
               <div style={{ padding:12, background:"rgba(52,211,153,0.1)", borderRadius:8, border:"1px solid rgba(52,211,153,0.2)" }}>
-                <div style={{ fontSize:11, color:"rgba(226,234,255,0.6)", marginBottom:4 }}>Last Transaction</div>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.6)", marginBottom:4 }}>{translateText("Last Transaction", lang)}</div>
                 <div style={{ fontSize:13, fontWeight:600, color:"#34d399" }}>{bankSnap.lastTransaction}</div>
               </div>
             </div>
             
             <div style={{ fontSize:12, fontWeight:600, color:"rgba(226,234,255,0.7)", marginBottom:8 }}>
-              📈 Recent Transactions
+              📈 {translateText("Recent Transactions", lang)}
             </div>
             <div style={{ maxHeight:200, overflowY:"auto", paddingRight:4 }}>
               {bankSnap.transactions.map((tx, idx) => (
