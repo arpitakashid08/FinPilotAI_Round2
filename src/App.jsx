@@ -1998,3 +1998,251 @@ function AskAstro({ updates, customerProfile }) {
           <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
             placeholder={translateText("Ask about loans, risk, fraud, investments…", lang)}
             className="glass-input"
+            style={{ 
+              flex:1, 
+              minWidth:200,
+              padding:"12px 16px", 
+              background:"rgba(15,23,42,0.9)", 
+              color:"#e2eaff", 
+              border:"1px solid rgba(148,163,184,0.5)", 
+              borderRadius:12, 
+              fontSize:14,
+              outline:"none"
+            }}
+          />
+          <button onClick={send} disabled={thinking || !input.trim()}
+            style={{
+              padding:"12px 20px",
+              background: thinking || !input.trim() ? "rgba(148,163,184,0.2)" : "rgba(99,179,255,0.15)",
+              border: thinking || !input.trim() ? "1px solid rgba(148,163,184,0.4)" : "1px solid rgba(99,179,255,0.3)",
+              borderRadius:12,
+              color: thinking || !input.trim() ? "#94a3b8" : "#e2eaff",
+              fontSize:12,
+              fontWeight:600,
+              cursor: thinking || !input.trim() ? "not-allowed" : "pointer",
+              transition:"all 0.2s"
+            }}
+          >
+            {thinking ? "..." : "Send"}
+          </button>
+        </div>
+        {chatErr && <div style={{ color:"#f87171", fontSize:12, marginTop:4 }}>{chatErr}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── HELPER COMPONENTS ───────────────────────────────────────────
+function HexNews({ title, cat, time, sentiment, delay = 0 }) {
+  const colors = { neutral: "#fbbf24", bullish: "#34d399", bearish: "#f87171" };
+  return (
+    <div style={{
+      padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+      borderRadius: 12, fontSize: 12, color: "#e2eaff", lineHeight: 1.5,
+      animation: `fadeUp 0.4s ease ${delay}s both`,
+      borderLeft: `3px solid ${colors[sentiment]}`,
+    }}>
+      <div style={{ fontWeight: 600, marginBottom: 4, color: colors[sentiment] }}>{title}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(226,234,255,0.4)" }}>
+        <span>{cat}</span>
+        <span>{time}</span>
+      </div>
+    </div>
+  );
+}
+
+function StockTicker({ ticker, price, change, color }) {
+  return (
+    <div style={{ 
+      padding: "14px 18px", 
+      background: "rgba(255,255,255,0.03)", 
+      border: "1px solid rgba(255,255,255,0.06)",
+      borderRadius: 12, 
+      display: "flex", 
+      justifyContent: "space-between", 
+      alignItems: "center" 
+    }}>
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#e2eaff" }}>{ticker}</div>
+        <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: "#e2eaff" }}>
+          ₹{price.toLocaleString("en-IN")}
+        </div>
+      </div>
+      <div style={{ 
+        padding: "4px 8px", 
+        borderRadius: 6, 
+        background: `${color}15`, 
+        color: color, 
+        fontSize: 11, 
+        fontWeight: 700,
+        fontFamily: "'JetBrains Mono', monospace"
+      }}>
+        {change > 0 ? "+" : ""}{change}%
+      </div>
+    </div>
+  );
+}
+
+function DoYouKnowButton({ question, answer }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <button 
+      onClick={() => setOpen(!open)}
+      style={{
+        padding: "12px 16px",
+        background: open ? "rgba(99,179,255,0.08)" : "rgba(255,255,255,0.03)",
+        border: open ? "1px solid rgba(99,179,255,0.2)" : "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 12,
+        textAlign: "left",
+        fontSize: 12,
+        color: "#e2eaff",
+        cursor: "pointer",
+        transition: "all 0.2s",
+        width: "100%"
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: open ? 8 : 0 }}>Q: {question}</div>
+      {open && <div style={{ color: "rgba(226,234,255,0.7)", lineHeight: 1.5 }}>A: {answer}</div>}
+    </button>
+  );
+}
+
+function KnowledgePill({ question, answer, delay = 0 }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{
+      padding: "12px 16px",
+      background: open ? "rgba(167,139,250,0.08)" : "rgba(255,255,255,0.03)",
+      border: open ? "1px solid rgba(167,139,250,0.2)" : "1px solid rgba(255,255,255,0.06)",
+      borderRadius: 12,
+      fontSize: 12,
+      color: "#e2eaff",
+      cursor: "pointer",
+      transition: "all 0.2s",
+      animation: `fadeUp 0.4s ease ${delay}s both`,
+    }}
+      onClick={() => setOpen(!open)}
+    >
+      <div style={{ fontWeight: 600, marginBottom: open ? 8 : 0 }}>Q: {question}</div>
+      {open && <div style={{ color: "rgba(226,234,255,0.7)", lineHeight: 1.5 }}>A: {answer}</div>}
+    </div>
+  );
+}
+
+// ── MAIN APP COMPONENT ───────────────────────────────────────────
+function App() {
+  const [page, setPage] = useState("home");
+  const [token, setToken] = useState("");
+  const [bankerToken, setBankerToken] = useState("");
+  const [profile, setProfile] = useState(null);
+  const [updates, setUpdates] = useState(null);
+  const [featureModules, setFeatureModules] = useState(null);
+  const [customerProfile, setCustomerProfile] = useState({
+    name: "Arjun Sharma",
+    income: 92000,
+    spending: 51000,
+    loans: 24000,
+    creditScore: 734,
+    riskLevel: "medium"
+  });
+  const [col, setCol] = useState(false);
+  const [introDone, setIntroDone] = useState(false);
+  const [authView, setAuthView] = useState("login");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobile = useIsMobile();
+
+  useEffect(() => {
+    const saved = localStorage.getItem("fp_token");
+    if (saved) setToken(saved);
+    const savedBanker = localStorage.getItem("fp_banker_token");
+    if (savedBanker) setBankerToken(savedBanker);
+    loadInitialData();
+  }, []);
+
+  const loadInitialData = async () => {
+    const [profileData, updatesData, modulesData] = await Promise.all([
+      api.getProfile(token),
+      api.getUpdates(),
+      api.getFeatureModules(),
+    ]);
+    setProfile(profileData);
+    setUpdates(updatesData);
+    setFeatureModules(modulesData);
+  };
+
+  const renderPage = () => {
+    switch (page) {
+      case "home": return <Home user={profile} updates={updates} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />;
+      case "astrofin": return <AstroFin updates={updates} customerProfile={customerProfile} />;
+      case "creditai": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>AI Credit Score Improver</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
+      case "crosssell": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>Intelligent Cross-Sell Engine</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
+      case "rmcopilot": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>Banker / RM Co-Pilot</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
+      case "compliance": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>Privacy & Compliance Layer</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
+      case "loan": return <Loan />;
+      case "fraud": return <Fraud />;
+      case "ai": return <AskAstro updates={updates} customerProfile={customerProfile} />;
+      case "analytics": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>Analytics</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
+      case "settings": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>Settings</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
+      default: return <Home user={profile} updates={updates} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />;
+    }
+  };
+
+  if (!introDone) return <Intro onDone={() => setIntroDone(true)} />;
+  if (!token) return authView === "login" ? <Login onSuccess={(data) => { setToken(data.token); setBankerToken(data.bankerToken); }} goSignup={() => setAuthView("signup")} /> : <Signup goLogin={() => setAuthView("login")} />;
+
+  return (
+    <>
+      <Styles />
+      <Starfield />
+      <div style={{ display: "flex", height: "100vh", position: "relative", zIndex: 1 }}>
+        {/* Mobile menu overlay */}
+        {mobile && mobileMenuOpen && (
+          <div style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.8)",
+            zIndex: 20,
+            display: "flex",
+            flexDirection: "column",
+            padding: 20,
+          }}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>FinPilot AI</div>
+              <button onClick={() => setMobileMenuOpen(false)} style={{ fontSize: 24, background: "none", border: "none", color: "#e2eaff", cursor: "pointer" }}>✕</button>
+            </div>
+            {NAV.map(n => (
+              <button key={n.id} onClick={() => { setPage(n.id); setMobileMenuOpen(false); }} style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "12px 16px", borderRadius: 12,
+                background: page === n.id ? "rgba(99,179,255,0.15)" : "transparent",
+                border: page === n.id ? "1px solid rgba(99,179,255,0.3)" : "1px solid transparent",
+                color: page === n.id ? "#e2eaff" : "rgba(226,234,255,0.6)",
+                fontSize: 14, fontWeight: 500,
+                cursor: "pointer", transition: "all 0.2s",
+              }}>
+                <span style={{ fontSize: 16 }}>{n.icon}</span>
+                <span>{n.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        
+        <Sidebar active={page} setActive={setPage} col={col} setCol={setCol} user={profile} />
+        
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <TopBar active={page} user={profile} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
+          <div className="page-content" style={{ flex: 1, overflowY: "auto", padding: mobile ? 16 : 32 }}>
+            {renderPage()}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default App;
