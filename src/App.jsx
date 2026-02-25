@@ -1189,10 +1189,10 @@ function AstroFin({ updates, customerProfile }) {
 
           <div style={{
             marginTop:14,
-            clipPath:"polygon(6% 0, 94% 0, 100% 18%, 100% 82%, 94% 100%, 6% 100%, 0 82%, 0 18%)",
+            clipPath:"polygon(4% 0, 96% 0, 100% 14%, 100% 86%, 96% 100%, 4% 100%, 0 86%, 0 14%)",
             border:`1px solid ${warn ? "rgba(248,113,113,0.35)" : "rgba(99,179,255,0.25)"}`,
             background: warn ? "rgba(248,113,113,0.07)" : "rgba(99,179,255,0.06)",
-            padding:"16px 18px",
+            padding:"16px 34px 16px 36px",
             display:"flex",
             flexDirection:"column",
             gap:10,
@@ -2549,11 +2549,11 @@ function BankerRMCopilot({
         ]} />
         <FeatureShard title="AI Suggestions (Mirrored)" color="#34d399" items={(liveResult.recommendations || []).map((r) => `${r.productName} • ${Math.round(r.confidence * 100)}%`)} />
       </div>
-      <div style={{ clipPath:"polygon(7% 0,100% 0,93% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.35)", background:"rgba(52,211,153,0.08)", padding:"16px 20px", display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
-        <select value={selectedProduct} onChange={(e)=>setSelectedProduct(e.target.value)} style={{ background:"rgba(3,7,18,0.8)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.2)", padding:"8px 10px" }}>
+      <div style={{ clipPath:"polygon(4% 0,100% 0,96% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.35)", background:"rgba(52,211,153,0.08)", padding:"16px 34px 16px 36px", display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+        <select value={selectedProduct} onChange={(e)=>setSelectedProduct(e.target.value)} style={{ background:"rgba(3,7,18,0.8)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.2)", padding:"8px 10px", minWidth:196 }}>
           {["Wealth Plus SIP","Secured Credit Card","Instant Personal Loan"].map((x)=><option key={x}>{x}</option>)}
         </select>
-        <select value={overrideMode} onChange={(e)=>setOverrideMode(e.target.value)} style={{ background:"rgba(3,7,18,0.8)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.2)", padding:"8px 10px" }}>
+        <select value={overrideMode} onChange={(e)=>setOverrideMode(e.target.value)} style={{ background:"rgba(3,7,18,0.8)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.2)", padding:"8px 10px", minWidth:120 }}>
           <option value="follow_ai">Follow AI</option>
           <option value="force_allow">Force Allow</option>
           <option value="force_block">Force Block</option>

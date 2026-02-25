@@ -129,8 +129,20 @@ export function fallbackReply(message = "", profile = {}, language = "en") {
     "Prioritise cash-flow stability first, then increase long-term investing step by step.",
     "Keep a 3–6 month emergency cushion before taking additional market risk.",
   ];
+  const hiVariants = [
+    "मासिक योजना बनाइए जिसमें EMI, ज़रूरी खर्च और निवेश की स्पष्ट सीमाएँ हों।",
+    "पहले कैश-फ्लो स्थिर रखें, फिर धीरे-धीरे लंबी अवधि का निवेश बढ़ाएँ।",
+    "अतिरिक्त मार्केट जोखिम लेने से पहले 3–6 महीने का इमरजेंसी फंड रखें।",
+  ];
+  const mrVariants = [
+    "EMI, आवश्यक खर्च आणि गुंतवणूक यासाठी स्पष्ट मर्यादा ठेवून मासिक योजना करा.",
+    "आधी कॅश-फ्लो स्थिर ठेवा, नंतर हळूहळू दीर्घकालीन गुंतवणूक वाढवा.",
+    "अतिरिक्त बाजार जोखीम घेण्यापूर्वी 3–6 महिन्यांचा आपत्कालीन निधी ठेवा.",
+  ];
   const seed = (q.length + (creditScore || 0)) % variants.length;
   const pre = variants[seed];
+  const preHi = hiVariants[seed];
+  const preMr = mrVariants[seed];
 
   if (language === "mr") {
     if (q.includes("financial health") || q.includes("health")) return `तुमची आर्थिक स्थिती: उत्पन्न ₹${income.toLocaleString("en-IN")}, बचत ₹${savings.toLocaleString("en-IN")}, EMI अनुपात ${Math.round(emiRatio * 100)}%, क्रेडिट स्कोअर ${creditScore}. EMI 35% खाली ठेवणे आणि अनावश्यक कर्ज टाळणे महत्त्वाचे आहे.`;
@@ -138,7 +150,7 @@ export function fallbackReply(message = "", profile = {}, language = "en") {
     if (q.includes("credit") || q.includes("score")) return "क्रेडिट स्कोअर वाढवण्यासाठी वेळेवर पेमेंट करा, उपयोग कमी ठेवा आणि वारंवार चौकशी टाळा.";
     if (q.includes("fraud") || q.includes("alert")) return "तत्काळ अलर्ट सुरू ठेवा, व्यवहार मर्यादा घट्ट ठेवा आणि OTP/PIN शेअर करू नका.";
     if (q.includes("stock") || q.includes("market") || q.includes("invest")) return "गुंतवणूक उद्दिष्टानुसार विभागा आणि एका थीममध्ये एकत्रित जोखीम टाळा.";
-    return "तुमचे उत्पन्न, EMI आणि उद्दिष्टे सांगा; मी अधिक अचूक योजना देईन.";
+    return `${preMr} तुमचे उत्पन्न, EMI आणि उद्दिष्टे सांगा; मी अधिक अचूक योजना देईन.`;
   }
   if (language === "hi") {
     if (q.includes("financial health") || q.includes("health")) return `आपकी वित्तीय स्थिति: आय ₹${income.toLocaleString("en-IN")}, बचत ₹${savings.toLocaleString("en-IN")}, EMI अनुपात ${Math.round(emiRatio * 100)}%, क्रेडिट स्कोर ${creditScore}. EMI 35% से नीचे रखें।`;
@@ -146,14 +158,14 @@ export function fallbackReply(message = "", profile = {}, language = "en") {
     if (q.includes("credit") || q.includes("score")) return "स्कोर सुधारने के लिए समय पर भुगतान करें, उपयोग कम रखें और नई पूछताछ कम करें।";
     if (q.includes("fraud") || q.includes("alert")) return "रीयल-टाइम अलर्ट चालू रखें और OTP/PIN कभी साझा न करें।";
     if (q.includes("stock") || q.includes("market") || q.includes("invest")) return "लक्ष्य-आधारित एसेट एलोकेशन अपनाएँ और एक ही थीम में अधिक निवेश न करें।";
-    return "अपनी आय, EMI और लक्ष्य बताइए; मैं बेहतर योजना दूँगा।";
+    return `${preHi} अपनी आय, EMI और लक्ष्य बताइए; मैं बेहतर योजना दूँगा।`;
   }
   if (q.includes("financial health") || q.includes("health")) return `${pre} Current snapshot: income ₹${income.toLocaleString("en-IN") || "0"}, savings ₹${savings.toLocaleString("en-IN") || "0"}, EMI ratio ${Math.round(emiRatio * 100)}%, credit ${creditScore || "n/a"}. Focus on reducing EMI ratio below 35% and keeping credit utilisation controlled.`;
   if (q.includes("loan") || q.includes("emi")) return `${pre} Keep EMI ratio near or below 35%, and prepay highest-interest debt first.`;
   if (q.includes("credit") || q.includes("score")) return `${pre} Improve score with on-time payments, low utilization, and fewer fresh hard inquiries.`;
   if (q.includes("fraud") || q.includes("alert")) return `${pre} Enable real-time alerts, tighten transfer limits, and never share OTP/PIN.`;
   if (q.includes("stock") || q.includes("market") || q.includes("invest")) return `${pre} Split by goal horizon and avoid concentrated entries in a single asset/theme.`;
-  if (language === "hi") return `${pre} अपने आय, खर्च और ईएमआई के आधार पर बताइए तो मैं और सटीक सलाह दूंगा।`;
-  if (language === "mr") return `${pre} तुमचे उत्पन्न, खर्च आणि EMI दिल्यास मी अधिक अचूक सल्ला देईन.`;
+  if (language === "hi") return `${preHi} अपनी आय, खर्च और ईएमआई के आधार पर बताइए तो मैं और सटीक सलाह दूंगा।`;
+  if (language === "mr") return `${preMr} तुमचे उत्पन्न, खर्च आणि EMI दिल्यास मी अधिक अचूक सल्ला देईन.`;
   return `${pre} Share your exact income, EMI and goals, and I will give a sharper plan.`;
 }
