@@ -90,8 +90,8 @@ export default async function handler(req, res) {
     if (req.method !== "POST") return methodNotAllowed(res);
     const body = getBody(req);
     const message = `${body?.message || ""}`;
-    const language = `${body?.language || "en"}`;
-    const langLabel = language === "mr" ? "Marathi" : language === "hi" ? "Hindi" : "English";
+    const language = "en";
+    const langLabel = "English";
     const profile = body?.profile || {};
     const prompt = `User question (${langLabel}): ${message}
 Customer context:
@@ -104,9 +104,6 @@ Customer context:
 Instructions: Analyse loans, overall financial health, and provide a tailored investment/debt strategy when relevant. ${strictLanguageInstruction(language)} Do not repeat canned lines.`;
     const generated = await generateAssistantReply(prompt);
     let reply = generated.reply || fallbackReply(message, profile, language);
-    if ((language === "mr" || language === "hi") && looksLatinHeavy(reply)) {
-      reply = fallbackReply(message, profile, language);
-    }
     return res.status(200).json({ reply, provider: generated.provider || "local" });
   }
 
@@ -116,16 +113,13 @@ Instructions: Analyse loans, overall financial health, and provide a tailored in
     const body = getBody(req);
     const transcript = `${body?.transcript || ""}`;
     const profile = body?.profile || {};
-    const language = `${body?.language || "en"}`;
-    const langLabel = language === "mr" ? "Marathi" : language === "hi" ? "Hindi" : "English";
+    const language = "en";
+    const langLabel = "English";
     const prompt = `User asked by voice (${langLabel}): ${transcript}
 Customer context: income ${profile?.income || "n/a"}, spending ${profile?.spending || "n/a"}, loans ${profile?.loans || "n/a"}, creditScore ${profile?.creditScore || "n/a"}.
 Reply quickly with direct action-oriented guidance. ${strictLanguageInstruction(language)}`;
     const generated = await generateAssistantReply(prompt);
     let reply = generated.reply || fallbackReply(transcript, profile, language);
-    if ((language === "mr" || language === "hi") && looksLatinHeavy(reply)) {
-      reply = fallbackReply(transcript, profile, language);
-    }
     return res.status(200).json({ transcript, reply, provider: generated.provider || "local" });
   }
 

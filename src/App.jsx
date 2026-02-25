@@ -1655,7 +1655,7 @@ function AskAstro({ updates, customerProfile }) {
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const [chatErr, setChatErr] = useState("");
-  const [lang, setLang] = useState("en"); // en, mr, hi
+  const [lang] = useState("en");
   const [bank, setBank] = useState("HDFC");
   const [bankSnap, setBankSnap] = useState(null);
   const [scanMsg, setScanMsg] = useState("");
@@ -1684,11 +1684,7 @@ function AskAstro({ updates, customerProfile }) {
     };
   }, []);
 
-  const getRecognitionLangChain = (languageCode) => {
-    if (languageCode === "mr") return ["mr-IN", "hi-IN", "en-IN", "en-US"];
-    if (languageCode === "hi") return ["hi-IN", "en-IN", "en-US"];
-    return ["en-US", "en-IN"];
-  };
+  const getRecognitionLangChain = () => ["en-US", "en-IN"];
 
   const buildRecognition = () => {
     const SR = window.webkitSpeechRecognition || window.SpeechRecognition;
@@ -1739,15 +1735,7 @@ function AskAstro({ updates, customerProfile }) {
     return rec;
   };
 
-  const enforceReplyLanguage = async (question, draft) => {
-    if (!["mr", "hi"].includes(lang)) return draft;
-    if (!/[A-Za-z]{4,}/.test(draft || "")) return draft;
-    const forcePrompt = lang === "mr"
-      ? `खालील प्रश्नाचे उत्तर फक्त मराठीत द्या. इंग्रजी शब्द टाळा: ${question}`
-      : `नीचे दिए प्रश्न का उत्तर केवल हिंदी में दें। अंग्रेज़ी शब्दों से बचें: ${question}`;
-    const strictReply = await api.askAstro({ message: forcePrompt, language: lang, profile: customerProfile });
-    return strictReply?.reply || draft;
-  };
+  const enforceReplyLanguage = async (_question, draft) => draft;
   
   // Handle voice input sending
   const handleVoiceSend = async (voiceText) => {
@@ -1760,7 +1748,7 @@ function AskAstro({ updates, customerProfile }) {
     setChatErr("");
     
     try {
-      const response = await api.voiceReply({ transcript: q, language: lang, profile: customerProfile });
+      const response = await api.voiceReply({ transcript: q, language: "en", profile: customerProfile });
       let text = response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang);
       text = await enforceReplyLanguage(q, text);
       setMsgs(m => [...m, { role:"ai", text }]);
@@ -1783,11 +1771,9 @@ function AskAstro({ updates, customerProfile }) {
     utterance.pitch = 1.0;
     utterance.rate = 0.9;
     utterance.volume = 0.8;
-    utterance.lang = lang === "mr" ? "mr-IN" : lang === "hi" ? "hi-IN" : "en-US";
+    utterance.lang = "en-US";
     const voices = window.speechSynthesis.getVoices?.() || [];
-    const voice = lang === "mr"
-      ? (voices.find((v) => `${v.lang}`.toLowerCase().startsWith("mr")) || voices.find((v) => `${v.lang}`.toLowerCase().startsWith("hi")))
-      : voices.find((v) => `${v.lang}`.toLowerCase().startsWith(lang === "hi" ? "hi" : "en"));
+    const voice = voices.find((v) => `${v.lang}`.toLowerCase().startsWith("en"));
     if (voice) utterance.voice = voice;
     
     utterance.onstart = () => setIsSpeaking(true);
@@ -1824,13 +1810,8 @@ function AskAstro({ updates, customerProfile }) {
   // Update initial message when language or user name changes
   useEffect(() => {
     const userName = customerProfile?.name || "there";
-    const greetings = {
-      en: `Hi ${userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.`,
-      hi: `नमस्ते ${userName}! मैं Astro हूँ। अपने loans, risk profile, fraud alerts और investment strategy के बारे में पूछिए।`,
-      mr: `नमस्कार ${userName}! मी Astro आहे. तुमच्या कर्ज, जोखीम प्रोफाइल, फसवणूक सूचना आणि गुंतवणूक धोरणाबद्दल विचारा.`,
-    };
-    setMsgs([{ role:"ai", text:greetings[lang] || greetings.en }]);
-  }, [lang, customerProfile?.name]);
+    setMsgs([{ role:"ai", text:`Hi ${userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.` }]);
+  }, [customerProfile?.name]);
   
   useEffect(() => { ref.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
 
@@ -1871,7 +1852,7 @@ function AskAstro({ updates, customerProfile }) {
     try {
       let response;
       
-      response = await api.askAstro({ message: q, language: lang, profile: customerProfile });
+      response = await api.askAstro({ message: q, language: "en", profile: customerProfile });
       let finalReply = response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang);
       finalReply = await enforceReplyLanguage(q, finalReply);
       
@@ -1893,26 +1874,7 @@ function AskAstro({ updates, customerProfile }) {
           <div style={{ color:"rgba(226,234,255,0.35)", fontFamily:"'JetBrains Mono', monospace", fontSize:mobile ? 9 : 11, marginTop:mobile ? 2 : 4 }}>{u.sub}</div>
         </div>
         <div style={{ display:"flex", gap:mobile ? 4 : 6, alignItems:"center", flexWrap:"wrap" }}>
-          <div style={{ fontSize:mobile ? 9 : 10, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(148,163,184,0.9)" }}>{u.language}</div>
-          {[
-            { id:"en", label:"English" },
-            { id:"mr", label:"Marathi" },
-            { id:"hi", label:"Hindi" },
-          ].map(l => {
-            const active = lang === l.id;
-            return (
-              <button key={l.id} onClick={()=>setLang(l.id)} style={{
-                padding:mobile ? "4px 8px" : "6px 10px",
-                fontSize:mobile ? 10 : 11,
-                borderRadius:999,
-                border: active ? "1px solid rgba(99,179,255,0.7)" : "1px solid rgba(148,163,184,0.5)",
-                background: active ? "rgba(99,179,255,0.16)" : "rgba(15,23,42,0.9)",
-                color: active ? "#e2eaff" : "rgba(226,234,255,0.7)",
-              }}>
-                {l.label}
-              </button>
-            );
-          })}
+          <div style={{ fontSize:mobile ? 9 : 10, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(148,163,184,0.9)" }}>Language: English</div>
         </div>
       </div>
 
@@ -2602,7 +2564,7 @@ function PrivacyCompliance({
         <FeatureShard title="RBAC + Policy" color="#34d399" items={[`Role: ${complianceState.role}`, `Data minimization: ${complianceState.dataMinimization ? "on" : "off"}`, `Strictness: ${complianceState.strictness}`]} />
         <FeatureShard title="Immediate Impact" color="#fbbf24" items={[`Eligible products now: ${liveResult.impacts.eligibility}`, `Blocked by compliance: ${liveResult.blockedByCompliance.length}`, `Risk class: ${liveResult.impacts.riskClass}`]} />
       </div>
-      <div style={{ clipPath:"polygon(7% 0,100% 0,93% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.35)", background:"rgba(99,179,255,0.08)", padding:"16px 20px", display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:10 }}>
+      <div style={{ clipPath:"polygon(3% 0,100% 0,97% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.35)", background:"rgba(99,179,255,0.08)", padding:"16px 30px 16px 34px", display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:10 }}>
         {["income","spending","loans","creditScore","riskLevel"].map((k) => (
           <label key={k} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12 }}><input type="checkbox" checked={complianceState.consent[k]} onChange={(e)=>setConsent(k, e.target.checked)} />{k} consent</label>
         ))}
@@ -2625,13 +2587,13 @@ function PrivacyCompliance({
       <div style={{ position:"relative", marginTop:4 }}>
         <div aria-hidden style={{
           position:"absolute", inset:0,
-          clipPath:"polygon(5% 0,95% 0,100% 16%,100% 84%,95% 100%,5% 100%,0 84%,0 16%)",
+          clipPath:"polygon(3% 0,97% 0,100% 14%,100% 86%,97% 100%,3% 100%,0 86%,0 14%)",
           border:"1px solid rgba(99,179,255,0.4)",
           background:"rgba(99,179,255,0.08)",
           boxShadow:"0 0 16px rgba(99,179,255,0.22)",
           pointerEvents:"none",
         }} />
-        <div style={{ position:"relative", padding:"18px 22px", paddingLeft:26 }}>
+        <div style={{ position:"relative", padding:"18px 28px", paddingLeft:34 }}>
           <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.11em", color:"#63b3ff", marginBottom:8, lineHeight:1.3 }}>Audit Logs (Realtime + API)</div>
           {[...auditTrail, ...(data.auditLogs || [])].slice(0, 14).length === 0 ? (
             <div style={{ fontSize:13, color:"rgba(226,234,255,0.72)" }}>No logs yet. Generate feature actions first.</div>
