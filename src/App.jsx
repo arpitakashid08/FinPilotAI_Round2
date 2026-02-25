@@ -2540,13 +2540,26 @@ function PrivacyCompliance({
   token, bankerToken, complianceState, setComplianceState, addAudit, customerProfile, engineConfig, auditTrail,
 }) {
   const [data, setData] = useState(fallbackCompliance);
+  const [loadingCompliance, setLoadingCompliance] = useState(false);
+  const [complianceMsg, setComplianceMsg] = useState("");
   const liveResult = useMemo(
     () => evaluateCrossSell(customerProfile, engineConfig, complianceState),
     [customerProfile, engineConfig, complianceState]
   );
   const load = async () => {
-    const d = await api.complianceStatus({ token: bankerToken || token });
-    setData(d);
+    setLoadingCompliance(true);
+    setComplianceMsg("");
+    try {
+      const d = await api.complianceStatus({ token: bankerToken || token });
+      setData(d || fallbackCompliance);
+      const now = new Date();
+      setComplianceMsg(`Updated ${now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`);
+    } catch {
+      setData((prev) => prev || fallbackCompliance);
+      setComplianceMsg("Refresh failed. Showing latest available compliance snapshot.");
+    } finally {
+      setLoadingCompliance(false);
+    }
   };
   useEffect(() => { load(); }, [token, bankerToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2594,7 +2607,7 @@ function PrivacyCompliance({
           pointerEvents:"none",
         }} />
         <div style={{ position:"relative", padding:"18px 28px", paddingLeft:34 }}>
-          <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.11em", color:"#63b3ff", marginBottom:8, lineHeight:1.3 }}>Audit Logs (Realtime + API)</div>
+          <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.11em", color:"#63b3ff", marginBottom:8, lineHeight:1.3 }}>Audit Logs</div>
           {[...auditTrail, ...(data.auditLogs || [])].slice(0, 14).length === 0 ? (
             <div style={{ fontSize:13, color:"rgba(226,234,255,0.72)" }}>No logs yet. Generate feature actions first.</div>
           ) : (
@@ -2615,7 +2628,10 @@ function PrivacyCompliance({
           )}
         </div>
       </div>
-      <button onClick={load} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"9px 14px", fontSize:12 }}>Refresh Compliance</button>
+      <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+        <button onClick={load} disabled={loadingCompliance} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:loadingCompliance?"rgba(148,163,184,0.2)":"rgba(99,179,255,0.12)", color:loadingCompliance?"rgba(226,234,255,0.6)":"#e2eaff", padding:"9px 14px", fontSize:12, cursor:loadingCompliance?"not-allowed":"pointer" }}>{loadingCompliance ? "Refreshing..." : "Refresh Compliance"}</button>
+        {!!complianceMsg && <div style={{ fontSize:12, color:"rgba(226,234,255,0.7)" }}>{complianceMsg}</div>}
+      </div>
     </div>
   );
 }
