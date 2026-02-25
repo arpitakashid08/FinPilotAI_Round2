@@ -909,9 +909,9 @@ function TopBar({ active, user, mobileMenuOpen, setMobileMenuOpen }) {
 // ── DATA LABEL (floating near sphere) ────────────────────────
 function OrbitLabel({ value, label, color, x, y }) {
   return (
-    <div className="orbit-label" style={{ position:"absolute", left:x, top:y, pointerEvents:"none", zIndex:4, minWidth:110 }}>
+    <div className="orbit-label" style={{ position:"absolute", left:x, top:y, pointerEvents:"none", zIndex:4, minWidth:124 }}>
       <div style={{ fontSize:18, fontWeight:800, fontFamily:"'JetBrains Mono', monospace", color, filter:`drop-shadow(0 0 8px ${color})` }}>{value}</div>
-      <div style={{ fontSize:10, color:"rgba(226,234,255,0.52)", textTransform:"uppercase", letterSpacing:"0.08em", marginTop:2, whiteSpace:"nowrap" }}>{label}</div>
+      <div style={{ fontSize:11, color:"rgba(226,234,255,0.58)", textTransform:"uppercase", letterSpacing:"0.08em", marginTop:2, whiteSpace:"nowrap" }}>{label}</div>
     </div>
   );
 }
@@ -922,8 +922,8 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
   const [tempIncome, setTempIncome] = useState(customerProfile.income);
   
   const metrics = [
-    { value:`₹${customerProfile.income.toLocaleString("en-IN")}`,   label:"Income",    color:"#34d399", x:"63%", y:"12%" },
-    { value:`₹${customerProfile.spending.toLocaleString("en-IN")}`,  label:"Spending",  color:"#fbbf24", x:"62%", y:"52%" },
+    { value:`₹${customerProfile.income.toLocaleString("en-IN")}`,   label:"Income",    color:"#34d399", x:"60%", y:"12%" },
+    { value:`₹${customerProfile.spending.toLocaleString("en-IN")}`,  label:"Spending",  color:"#fbbf24", x:"58%", y:"50%" },
     { value:`₹${(customerProfile.income - customerProfile.spending).toLocaleString("en-IN")}`,  label:"Cash Flow", color:"#63b3ff", x:"5%",  y:"20%" },
     { value:`₹${customerProfile.loans.toLocaleString("en-IN")}`,label:"Liabilities",color:"#f87171",x:"2%",y:"62%"},
   ];
@@ -1664,6 +1664,7 @@ function AskAstro({ updates, customerProfile }) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [captureLang, setCaptureLang] = useState("");
   const recognitionRef = useRef(null);
   const uiCopy = {
     en: { ask: "Ask Astro", sub: "// conversational AI — powered by your financial twin", language: "Language", startVoice: "Start Voice", stop: "Stop", speak: "Speak Response", speaking: "Speaking...", ready: "Voice Ready", listening: "Listening..." },
@@ -1677,15 +1678,30 @@ function AskAstro({ updates, customerProfile }) {
     const speechSupported = "speechSynthesis" in window;
     const recognitionSupported = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
     setVoiceSupported(speechSupported && recognitionSupported);
-    if (!recognitionSupported) return;
+    return () => {
+      try { recognitionRef.current?.abort(); } catch {}
+      recognitionRef.current = null;
+    };
+  }, []);
 
+  const getRecognitionLangChain = (languageCode) => {
+    if (languageCode === "mr") return ["mr-IN", "hi-IN", "en-IN", "en-US"];
+    if (languageCode === "hi") return ["hi-IN", "en-IN", "en-US"];
+    return ["en-US", "en-IN"];
+  };
+
+  const buildRecognition = () => {
     const SR = window.webkitSpeechRecognition || window.SpeechRecognition;
+    if (!SR) return null;
     const rec = new SR();
+    const langChain = getRecognitionLangChain(lang);
+    let langIdx = 0;
+
     rec.continuous = false;
     rec.interimResults = true;
     rec.maxAlternatives = 1;
-    const langMap = { mr: "mr-IN", hi: "hi-IN", en: "en-US" };
-    rec.lang = langMap[lang] || "en-US";
+    rec.lang = langChain[langIdx];
+    setCaptureLang(rec.lang);
 
     rec.onresult = (event) => {
       let finalText = "";
@@ -1704,24 +1720,34 @@ function AskAstro({ updates, customerProfile }) {
     };
 
     rec.onerror = (event) => {
-      // Some browsers may not support mr-IN reliably; fallback to hi-IN for Marathi capture.
-      if (event?.error === "language-not-supported" && lang === "mr") {
+      if (event?.error === "language-not-supported" && langIdx < langChain.length - 1) {
+        langIdx += 1;
+        rec.lang = langChain[langIdx];
+        setCaptureLang(rec.lang);
         try {
-          rec.lang = "hi-IN";
           rec.start();
           return;
         } catch {}
       }
+      if (event?.error === "no-speech") {
+        setChatErr(translateText("No voice detected. Please speak near the mic and retry.", lang));
+      }
       setIsListening(false);
     };
-    rec.onend = () => setIsListening(false);
-    recognitionRef.current = rec;
 
-    return () => {
-      try { rec.abort(); } catch {}
-      recognitionRef.current = null;
-    };
-  }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
+    rec.onend = () => setIsListening(false);
+    return rec;
+  };
+
+  const enforceReplyLanguage = async (question, draft) => {
+    if (!["mr", "hi"].includes(lang)) return draft;
+    if (!/[A-Za-z]{4,}/.test(draft || "")) return draft;
+    const forcePrompt = lang === "mr"
+      ? `खालील प्रश्नाचे उत्तर फक्त मराठीत द्या. इंग्रजी शब्द टाळा: ${question}`
+      : `नीचे दिए प्रश्न का उत्तर केवल हिंदी में दें। अंग्रेज़ी शब्दों से बचें: ${question}`;
+    const strictReply = await api.askAstro({ message: forcePrompt, language: lang, profile: customerProfile });
+    return strictReply?.reply || draft;
+  };
   
   // Handle voice input sending
   const handleVoiceSend = async (voiceText) => {
@@ -1734,12 +1760,9 @@ function AskAstro({ updates, customerProfile }) {
     setChatErr("");
     
     try {
-      let response = await api.voiceReply({ transcript: q, language: lang, profile: customerProfile });
+      const response = await api.voiceReply({ transcript: q, language: lang, profile: customerProfile });
       let text = response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang);
-      if (lang === "mr" && /[a-zA-Z]{5,}/.test(text)) {
-        const r2 = await api.askAstro({ message: `कृपया उत्तर फक्त मराठीत द्या: ${q}`, language: "mr", profile: customerProfile });
-        text = r2.reply || text;
-      }
+      text = await enforceReplyLanguage(q, text);
       setMsgs(m => [...m, { role:"ai", text }]);
       speakText(text);
     } catch {
@@ -1760,7 +1783,12 @@ function AskAstro({ updates, customerProfile }) {
     utterance.pitch = 1.0;
     utterance.rate = 0.9;
     utterance.volume = 0.8;
-    utterance.lang = lang === 'mr' ? 'mr-IN' : lang === 'hi' ? 'hi-IN' : 'en-US';
+    utterance.lang = lang === "mr" ? "mr-IN" : lang === "hi" ? "hi-IN" : "en-US";
+    const voices = window.speechSynthesis.getVoices?.() || [];
+    const voice = lang === "mr"
+      ? (voices.find((v) => `${v.lang}`.toLowerCase().startsWith("mr")) || voices.find((v) => `${v.lang}`.toLowerCase().startsWith("hi")))
+      : voices.find((v) => `${v.lang}`.toLowerCase().startsWith(lang === "hi" ? "hi" : "en"));
+    if (voice) utterance.voice = voice;
     
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
@@ -1771,9 +1799,13 @@ function AskAstro({ updates, customerProfile }) {
   
   // Start voice recognition
   const startListening = () => {
-    const rec = recognitionRef.current;
-    if (!rec || isListening) return;
+    if (isListening || !voiceSupported) return;
+    try { recognitionRef.current?.abort(); } catch {}
+    const rec = buildRecognition();
+    if (!rec) return;
+    recognitionRef.current = rec;
     setInput("");
+    setChatErr("");
     setIsListening(true);
     try { rec.start(); } catch { setIsListening(false); }
   };
@@ -1841,10 +1873,7 @@ function AskAstro({ updates, customerProfile }) {
       
       response = await api.askAstro({ message: q, language: lang, profile: customerProfile });
       let finalReply = response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang);
-      if (lang === "mr" && /[a-zA-Z]{5,}/.test(finalReply)) {
-        const r2 = await api.askAstro({ message: `कृपया उत्तर फक्त मराठीत द्या: ${q}`, language: "mr", profile: customerProfile });
-        finalReply = r2.reply || finalReply;
-      }
+      finalReply = await enforceReplyLanguage(q, finalReply);
       
       setMsgs(m => [...m, { role:"ai", text: finalReply }]);
     } catch {
@@ -1953,6 +1982,9 @@ function AskAstro({ updates, customerProfile }) {
                 </>
               )}
             </button>
+            <span style={{ fontSize:10, color:"rgba(226,234,255,0.55)", fontFamily:"'JetBrains Mono', monospace", minWidth:72 }}>
+              {isListening ? `mic:${captureLang || "--"}` : ""}
+            </span>
 
             {/* Voice Output Button */}
             <button
@@ -2427,15 +2459,15 @@ function SmartCrossSell({ customerProfile, setCustomerProfile, engineConfig, add
           <div key={rec.productName} style={{ position:"relative", transition:"all 0.28s ease", animation:`fadeUp 0.32s ease ${i * 0.06}s both` }}>
             <div aria-hidden style={{
               position:"absolute", inset:0,
-              clipPath:"polygon(8% 0, 92% 0, 100% 18%, 100% 82%, 92% 100%, 8% 100%, 0 82%, 0 18%)",
+              clipPath:"polygon(6% 0, 94% 0, 100% 16%, 100% 84%, 94% 100%, 6% 100%, 0 84%, 0 16%)",
               border:"1px solid rgba(52,211,153,0.4)",
               background:"linear-gradient(145deg, rgba(52,211,153,0.16), rgba(99,179,255,0.06))",
               boxShadow:"0 0 18px rgba(52,211,153,0.28)",
               pointerEvents:"none",
             }} />
-            <div style={{ position:"relative", padding:"16px 22px", paddingLeft:26, display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ position:"relative", padding:"16px 24px", paddingLeft:30, display:"flex", flexDirection:"column", gap:10 }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
-                <div style={{ fontSize:18, fontWeight:800 }}>{rec.productName}</div>
+                <div style={{ fontSize:18, fontWeight:800, lineHeight:1.2 }}>{rec.productName}</div>
                 <div style={{ clipPath:"polygon(15% 0,100% 0,85% 100%,0 100%)", border:"1px solid rgba(255,255,255,0.25)", padding:"4px 9px", fontSize:10, color:rec.riskTag==="Low"?"#34d399":"#fbbf24" }}>{rec.riskTag}</div>
               </div>
               <div style={{ fontSize:13, color:"rgba(226,234,255,0.82)", lineHeight:1.6 }}>{rec.reason}</div>
@@ -3257,11 +3289,11 @@ function HexNews({ title, cat, time, sentiment, delay }) {
   const borderColor = sentiment === "bullish" ? "#34d399" : sentiment === "bearish" ? "#f87171" : "#63b3ff";
   return (
     <div style={{
-      position:"relative", width:292, minHeight:188,
-      clipPath:"polygon(16% 0%, 84% 0%, 100% 50%, 84% 100%, 16% 100%, 0% 50%)",
+      position:"relative", width:300, minHeight:212,
+      clipPath:"polygon(12% 0%, 88% 0%, 100% 50%, 88% 100%, 12% 100%, 0% 50%)",
       background:"rgba(255,255,255,0.045)",
       border:`1px solid ${borderColor}45`,
-      padding:"26px 20px", display:"flex", alignItems:"center", justifyContent:"center",
+      padding:"22px 30px 24px", display:"flex", alignItems:"flex-start", justifyContent:"center",
       animation:`fadeUp 0.4s ease ${delay}s both`,
       transition:"all 0.2s",
       boxShadow:`0 0 22px ${borderColor}22`,
@@ -3269,10 +3301,10 @@ function HexNews({ title, cat, time, sentiment, delay }) {
       onMouseEnter={e => { e.currentTarget.style.background = `${borderColor}10`; e.currentTarget.style.borderColor = `${borderColor}60`; }}
       onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = `${borderColor}30`; }}
     >
-      <div style={{ width:"70%", minWidth:0, margin:"0 auto" }}>
+      <div style={{ width:"80%", minWidth:0, margin:"0 auto" }}>
         <div style={{ fontSize:14, textTransform:"uppercase", letterSpacing:"0.09em", color:`${borderColor}`, marginBottom:10, fontWeight:800, whiteSpace:"nowrap" }}>{cat}</div>
         <div style={{
-          fontSize:20, lineHeight:1.4, marginBottom:10, fontWeight:800, color:"#eef6ff",
+          fontSize:20, lineHeight:1.35, marginBottom:12, fontWeight:800, color:"#eef6ff",
           textShadow:"0 0 10px rgba(0,0,0,0.35)",
           display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden",
         }}>{title}</div>

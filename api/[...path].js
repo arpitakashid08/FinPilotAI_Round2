@@ -18,6 +18,18 @@ function nameFromEmail(email = "") {
     .join(" ");
 }
 
+function looksLatinHeavy(text = "") {
+  const latin = (`${text}`.match(/[A-Za-z]/g) || []).length;
+  const devanagari = (`${text}`.match(/[\u0900-\u097F]/g) || []).length;
+  return latin > 20 && latin > devanagari;
+}
+
+function strictLanguageInstruction(language) {
+  if (language === "mr") return "Respond only in Marathi (Devanagari). Avoid English unless unavoidable for proper nouns.";
+  if (language === "hi") return "Respond only in Hindi (Devanagari). Avoid English unless unavoidable for proper nouns.";
+  return "Respond in English.";
+}
+
 export default async function handler(req, res) {
   const url = new URL(req.url || "", "http://localhost");
   const path = url.pathname || "";
@@ -89,9 +101,12 @@ Customer context:
 - loans: ${profile?.loans || "n/a"}
 - creditScore: ${profile?.creditScore || "n/a"}
 - riskLevel: ${profile?.riskLevel || "n/a"}
-Instructions: Analyse loans, overall financial health, and provide a tailored investment/debt strategy when relevant. Respond in ${langLabel}. Do not repeat canned lines.`;
+Instructions: Analyse loans, overall financial health, and provide a tailored investment/debt strategy when relevant. ${strictLanguageInstruction(language)} Do not repeat canned lines.`;
     const generated = await generateAssistantReply(prompt);
-    const reply = generated.reply || fallbackReply(message, profile, language);
+    let reply = generated.reply || fallbackReply(message, profile, language);
+    if ((language === "mr" || language === "hi") && looksLatinHeavy(reply)) {
+      reply = fallbackReply(message, profile, language);
+    }
     return res.status(200).json({ reply, provider: generated.provider || "local" });
   }
 
@@ -105,9 +120,12 @@ Instructions: Analyse loans, overall financial health, and provide a tailored in
     const langLabel = language === "mr" ? "Marathi" : language === "hi" ? "Hindi" : "English";
     const prompt = `User asked by voice (${langLabel}): ${transcript}
 Customer context: income ${profile?.income || "n/a"}, spending ${profile?.spending || "n/a"}, loans ${profile?.loans || "n/a"}, creditScore ${profile?.creditScore || "n/a"}.
-Reply quickly in ${langLabel} with direct action-oriented guidance.`;
+Reply quickly with direct action-oriented guidance. ${strictLanguageInstruction(language)}`;
     const generated = await generateAssistantReply(prompt);
-    const reply = generated.reply || fallbackReply(transcript, profile, language);
+    let reply = generated.reply || fallbackReply(transcript, profile, language);
+    if ((language === "mr" || language === "hi") && looksLatinHeavy(reply)) {
+      reply = fallbackReply(transcript, profile, language);
+    }
     return res.status(200).json({ transcript, reply, provider: generated.provider || "local" });
   }
 
