@@ -1,7 +1,7 @@
 // FinPilot AI — Sphere Edition
 // Design: 3D glowing orbs, starfield, NO rectangular cards
 // Inspired by AstroFin mockup: organic spheres, particle fields, orbital data
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
@@ -2251,118 +2251,99 @@ function FeatureShard({ title, items, color, delay = 0 }) {
   );
 }
 
-function SmartCrossSell({ token, customerProfile, setCustomerProfile }) {
-  const [result, setResult] = useState(fallbackCrossSell);
-  const [loading, setLoading] = useState(false);
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+
+function evaluateCrossSell(profile, engineConfig, complianceState) {
+  const income = Number(profile?.income || 0);
+  const spending = Number(profile?.spending || 0);
+  const loans = Number(profile?.loans || 0);
+  const creditScore = Number(profile?.creditScore || 650);
+  const savingsRatio = income > 0 ? (income - spending) / income : 0;
+  const debtToIncome = income > 0 ? loans / income : 1;
+  const utilization = income > 0 ? spending / income : 1;
+  const tolerance = Number(engineConfig?.riskTolerance || 55);
+  const strictness = Number(complianceState?.strictness || 70);
+  const consent = complianceState?.consent || {};
+  const minimization = !!complianceState?.dataMinimization;
+
+  const catalog = [
+    { id: "sip", productName: "Wealth Plus SIP", risk: "Low", fields: ["income", "spending", "creditScore"], ctaPrimary: "Apply", ctaSecondary: "Save" },
+    { id: "secured", productName: "Secured Credit Card", risk: "Medium", fields: ["income", "loans", "creditScore"], ctaPrimary: "Apply", ctaSecondary: "Save" },
+    { id: "loan", productName: "Instant Personal Loan", risk: "Medium", fields: ["income", "loans", "creditScore", "riskLevel"], ctaPrimary: "Apply", ctaSecondary: "Save" },
+  ];
+
+  const blockedByCompliance = [];
+  const recs = [];
+
+  catalog.forEach((p) => {
+    const missingConsent = p.fields.filter((f) => consent[f] === false);
+    if (minimization && missingConsent.length) {
+      blockedByCompliance.push(`${p.productName}: blocked by consent (${missingConsent.join(", ")})`);
+      return;
+    }
+
+    let eligible = false;
+    let confidence = 0.55;
+    let reason = "";
+
+    if (p.id === "sip") {
+      eligible = savingsRatio > 0.12 && creditScore >= 640;
+      confidence = clamp(0.58 + savingsRatio * 0.6 + (creditScore - 650) / 800 - strictness / 1000, 0.5, 0.96);
+      reason = `Recommended because savings ratio is ${Math.round(savingsRatio * 100)}% and credit score is ${creditScore}.`;
+    }
+    if (p.id === "secured") {
+      eligible = creditScore >= 600 && debtToIncome < 0.62;
+      confidence = clamp(0.57 + (creditScore - 600) / 700 + (0.6 - debtToIncome) * 0.35 - strictness / 1100, 0.5, 0.95);
+      reason = `Recommended because debt-to-income is ${Math.round(debtToIncome * 100)}% with stable affordability.`;
+    }
+    if (p.id === "loan") {
+      eligible = creditScore >= 680 && debtToIncome < 0.45 && utilization < 0.82;
+      confidence = clamp(0.52 + (creditScore - 680) / 650 + (0.5 - debtToIncome) * 0.4 - strictness / 900, 0.5, 0.93);
+      reason = `Recommended because affordability is within policy and utilisation is ${Math.round(utilization * 100)}%.`;
+    }
+
+    // Banker risk appetite shifts model's risk allowance in real time.
+    const toleranceBoost = (tolerance - 55) / 220;
+    confidence = clamp(confidence + toleranceBoost, 0.45, 0.97);
+    if (tolerance < 35 && p.risk === "Medium") eligible = eligible && confidence >= 0.62;
+
+    if (eligible) {
+      recs.push({
+        productName: p.productName,
+        reason,
+        confidence: Number(confidence.toFixed(2)),
+        riskTag: p.risk,
+        ctaPrimary: p.ctaPrimary,
+        ctaSecondary: p.ctaSecondary,
+      });
+    }
+  });
+
+  const recommendations = recs.sort((a, b) => b.confidence - a.confidence);
+  const top = recommendations[0];
+  const riskScore = clamp(Math.round((1 - savingsRatio) * 55 + debtToIncome * 40 + utilization * 25), 8, 96);
+  return {
+    recommendations,
+    reasoningOutput: top ? `Recommended because affordability, risk appetite, and consent checks favor ${top.productName}.` : "No eligible products after affordability/consent checks.",
+    confidenceTop: top?.confidence || 0,
+    filteredUnsafe: Math.max(0, catalog.length - recommendations.length),
+    blockedByCompliance,
+    profile: { riskScore },
+    impacts: {
+      eligibility: recommendations.length,
+      affordability: debtToIncome < 0.4 ? "Healthy" : debtToIncome < 0.55 ? "Watch" : "Stressed",
+      riskClass: riskScore <= 40 ? "Low" : riskScore <= 68 ? "Medium" : "High",
+    },
+  };
+}
+
+function SmartCrossSell({ customerProfile, setCustomerProfile, engineConfig, addAudit, complianceState }) {
   const profile = customerProfile;
   const update = (k, v) => setCustomerProfile((p) => ({ ...p, [k]: v }));
-  
-  // Dynamic reasoning logic based on profile data
-  const generateDynamicRecommendations = (profileData) => {
-    const { income, spending, loans, creditScore, riskLevel } = profileData;
-    const savingsRatio = (income - spending) / income;
-    const debtToIncome = loans / income;
-    const creditUtilization = spending / income;
-    
-    const recommendations = [];
-    let reasoningOutput = "";
-    let topConfidence = 0;
-    
-    // Wealth Plus SIP logic
-    if (savingsRatio > 0.3 && creditScore > 700) {
-      recommendations.push({
-        productName: "Wealth Plus SIP",
-        reason: `High savings ratio (${Math.round(savingsRatio * 100)}%) and excellent credit score (${creditScore}) indicate strong investment capacity.`,
-        confidence: 0.92,
-        riskTag: "Low",
-        ctaPrimary: "Apply",
-        ctaSecondary: "Save"
-      });
-      topConfidence = Math.max(topConfidence, 0.92);
-    } else if (savingsRatio > 0.2) {
-      recommendations.push({
-        productName: "Wealth Plus SIP",
-        reason: `Moderate savings ratio (${Math.round(savingsRatio * 100)}%) suggests potential for systematic investment planning.`,
-        confidence: 0.75,
-        riskTag: "Low",
-        ctaPrimary: "Apply",
-        ctaSecondary: "Save"
-      });
-      topConfidence = Math.max(topConfidence, 0.75);
-    }
-    
-    // Secured Credit Card logic
-    if (creditScore > 750 && debtToIncome < 0.3) {
-      recommendations.push({
-        productName: "Secured Credit Card",
-        reason: `Excellent credit score (${creditScore}) and low debt-to-income ratio (${Math.round(debtToIncome * 100)}%) qualify for premium secured card.`,
-        confidence: 0.88,
-        riskTag: "Low",
-        ctaPrimary: "Apply",
-        ctaSecondary: "Save"
-      });
-      topConfidence = Math.max(topConfidence, 0.88);
-    } else if (creditScore > 650 && debtToIncome < 0.5) {
-      recommendations.push({
-        productName: "Secured Credit Card",
-        reason: `Good credit score (${creditScore}) and manageable debt levels (${Math.round(debtToIncome * 100)}% DTI) support secured card eligibility.`,
-        confidence: 0.72,
-        riskTag: "Medium",
-        ctaPrimary: "Apply",
-        ctaSecondary: "Save"
-      });
-      topConfidence = Math.max(topConfidence, 0.72);
-    }
-    
-    // Instant Personal Loan logic
-    if (spending > income * 0.8 && creditScore > 600) {
-      recommendations.push({
-        productName: "Instant Personal Loan",
-        reason: `High spending ratio (${Math.round(creditUtilization * 100)}%) with decent credit score (${creditScore}) suggests need for liquidity management.`,
-        confidence: 0.68,
-        riskTag: "Medium",
-        ctaPrimary: "Apply",
-        ctaSecondary: "Save"
-      });
-      topConfidence = Math.max(topConfidence, 0.68);
-    } else if (loans > 50000 && creditScore > 700) {
-      recommendations.push({
-        productName: "Instant Personal Loan",
-        reason: `Existing loan portfolio (₹${loans.toLocaleString("en-IN")}) with strong credit score (${creditScore}) indicates loan consolidation opportunity.`,
-        confidence: 0.74,
-        riskTag: "Low",
-        ctaPrimary: "Apply",
-        ctaSecondary: "Save"
-      });
-      topConfidence = Math.max(topConfidence, 0.74);
-    }
-    
-    // Generate reasoning output
-    if (recommendations.length > 0) {
-      const topRec = recommendations.reduce((prev, curr) => prev.confidence > curr.confidence ? prev : curr);
-      reasoningOutput = `Primary recommendation: ${topRec.productName}. Based on income ₹${income.toLocaleString("en-IN")}, spending ratio ${Math.round(creditUtilization * 100)}%, and credit score ${creditScore}.`;
-    } else {
-      reasoningOutput = `Profile analysis complete. Income: ₹${income.toLocaleString("en-IN")}, Credit Score: ${creditScore}. Current financial profile is stable - consider savings products.`;
-    }
-    
-    return {
-      recommendations,
-      reasoningOutput,
-      confidenceTop: topConfidence,
-      profile: { riskScore: Math.round((1 - savingsRatio) * 100) },
-      filteredUnsafe: riskLevel === "high" ? 2 : riskLevel === "medium" ? 1 : 0
-    };
-  };
-  
-  const run = async () => {
-    setLoading(true);
-    // Simulate API call with dynamic logic
-    setTimeout(() => {
-      const dynamicResult = generateDynamicRecommendations(profile);
-      setResult(dynamicResult);
-      setLoading(false);
-    }, 1000);
-  };
+  const result = useMemo(
+    () => evaluateCrossSell(profile, engineConfig, complianceState),
+    [profile, engineConfig, complianceState]
+  );
 
   return (
     <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:20 }}>
@@ -2399,16 +2380,31 @@ function SmartCrossSell({ token, customerProfile, setCustomerProfile }) {
                 </button>
               ))}
             </div>
-            <div style={{ marginTop:4 }}>
-              <Btn onClick={run} loading={loading}>POST /cross-sell/recommend</Btn>
+            <div style={{ marginTop:4, display:"flex", gap:8, flexWrap:"wrap" }}>
+              <button onClick={() => { update("income", profile.income + 10000); addAudit("scenario_salary_up", "ok"); }} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.45)", background:"rgba(52,211,153,0.12)", color:"#e2eaff", padding:"7px 10px", fontSize:11 }}>+ Salary</button>
+              <button onClick={() => { update("loans", profile.loans + 10000); addAudit("scenario_loan_up", "ok"); }} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(248,113,113,0.45)", background:"rgba(248,113,113,0.12)", color:"#e2eaff", padding:"7px 10px", fontSize:11 }}>+ Loan</button>
+              <button onClick={() => { setCustomerProfile((p) => ({ ...p, income: 92000, spending: 51000, loans: 24000, creditScore: 734, riskLevel: "medium" })); addAudit("scenario_reset", "ok"); }} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.45)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"7px 10px", fontSize:11 }}>Reset</button>
             </div>
           </div>
         </div>
-        <FeatureShard title="Reasoning Output" color="#34d399" items={[result.reasoningOutput || "No recommendation yet", `Top confidence ${Math.round((result.confidenceTop || 0) * 100)}%`, `Unsafe filtered ${result.filteredUnsafe || 0}`]} />
+        <FeatureShard
+          title="Reasoning Output"
+          color="#34d399"
+          items={[
+            result.reasoningOutput || "No recommendation yet",
+            `Top confidence ${Math.round((result.confidenceTop || 0) * 100)}%`,
+            `Unsafe filtered ${result.filteredUnsafe || 0}`,
+            `Affordability: ${result.impacts?.affordability}`,
+            `Risk class: ${result.impacts?.riskClass}`,
+          ]}
+        />
       </div>
+      {result.blockedByCompliance?.length > 0 && (
+        <FeatureShard title="Compliance Filters" color="#fbbf24" items={result.blockedByCompliance} />
+      )}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))", gap:14 }}>
         {(result.recommendations || []).map((rec, i) => (
-          <div key={i} style={{ position:"relative" }}>
+          <div key={rec.productName} style={{ position:"relative", transition:"all 0.28s ease", animation:`fadeUp 0.32s ease ${i * 0.06}s both` }}>
             <div aria-hidden style={{
               position:"absolute", inset:0,
               clipPath:"polygon(8% 0, 92% 0, 100% 18%, 100% 82%, 92% 100%, 8% 100%, 0 82%, 0 18%)",
@@ -2436,245 +2432,143 @@ function SmartCrossSell({ token, customerProfile, setCustomerProfile }) {
   );
 }
 
-function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, setCustomerProfile }) {
-  const [summary, setSummary] = useState(null);
-  const [decision, setDecision] = useState(null);
-  const [selectedProduct, setSelectedProduct] = useState("Secured Credit Card");
+function BankerRMCopilot({
+  token, bankerToken, setBankerToken, customerProfile,
+  engineConfig, setEngineConfig, complianceState, addAudit,
+}) {
+  const [selectedProduct, setSelectedProduct] = useState("Wealth Plus SIP");
+  const [overrideMode, setOverrideMode] = useState("follow_ai");
+  const [overrideRiskAdj, setOverrideRiskAdj] = useState(0);
+  const [note, setNote] = useState("");
   const [err, setErr] = useState("");
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [sessionSecure, setSessionSecure] = useState(false);
   const activeToken = bankerToken || token;
 
-  // Security & Authentication Layer
-  const authenticateBanker = () => {
-    if (!activeToken) {
-      setErr("🔒 Banker authentication required. Please provide valid credentials.");
-      return false;
-    }
-    
-    // Simulate secure authentication
-    setIsAuthenticated(true);
-    setSessionSecure(true);
-    setErr("");
-    return true;
-  };
+  const liveResult = useMemo(
+    () => evaluateCrossSell(customerProfile, engineConfig, complianceState),
+    [customerProfile, engineConfig, complianceState]
+  );
+  const selectedAi = (liveResult.recommendations || []).find((x) => x.productName === selectedProduct);
 
-  const enableBanker = () => {
-    if (authenticateBanker()) {
-      setBankerToken("banker_" + Date.now());
-      setErr("✅ Banker mode enabled - Secure session active");
-    }
-  };
+  const finalDecision = useMemo(() => {
+    const baseAllowed = !!selectedAi;
+    const allowed = overrideMode === "force_allow" ? true : overrideMode === "force_block" ? false : baseAllowed;
+    const confidence = clamp((selectedAi?.confidence || 0.55) + overrideRiskAdj / 100, 0.4, 0.98);
+    const impact = overrideMode === "follow_ai"
+      ? "Following AI path; compliance impact minimal."
+      : overrideMode === "force_allow"
+        ? "Override increases exposure; check affordability and consent safeguards."
+        : "Override blocks a potentially eligible product; safer risk posture but lower conversion.";
+    return { allowed, confidence, reason: selectedAi?.reason || "No current AI eligibility for this product.", impact };
+  }, [selectedAi, overrideMode, overrideRiskAdj]);
 
-  // Generate product-specific reasonings
-  const getProductReasoning = (product, profile) => {
-    const { income, spending, loans, creditScore, riskLevel } = profile;
-    const savingsRatio = (income - spending) / income;
-    const debtToIncome = loans / income;
-    const creditUtilization = spending / income;
-
-    switch (product) {
-      case "Secured Credit Card":
-        if (creditScore > 750 && debtToIncome < 0.3) {
-          return {
-            allowed: true,
-            recommend: "APPROVED - Premium Secured Card",
-            reason: "Excellent credit score (>750) and low debt-to-income ratio (<30%) qualify for premium secured credit card with ₹2,00,000 limit and cashback benefits."
-          };
-        } else if (creditScore > 650 && debtToIncome < 0.5) {
-          return {
-            allowed: true,
-            recommend: "APPROVED - Standard Secured Card",
-            reason: "Good credit score (>650) and manageable debt levels (<50% DTI) support secured credit card eligibility with ₹1,00,000 limit."
-          };
-        } else {
-          return {
-            allowed: false,
-            recommend: "BLOCKED - Improve Credit Profile",
-            reason: `Credit score ${creditScore} and DTI ${Math.round(debtToIncome * 100)}% below threshold. Focus on reducing existing debt and improving payment history.`
-          };
-        }
-
-      case "Wealth Plus SIP":
-        if (savingsRatio > 0.3 && creditScore > 700) {
-          return {
-            allowed: true,
-            recommend: "APPROVED - Wealth Plus SIP",
-            reason: `High savings ratio (${Math.round(savingsRatio * 100)}%) and excellent credit score (${creditScore}) indicate strong investment capacity. Recommended SIP: ₹15,000/month for diversified portfolio.`
-          };
-        } else if (savingsRatio > 0.2) {
-          return {
-            allowed: true,
-            recommend: "APPROVED - Starter SIP",
-            reason: `Moderate savings ratio (${Math.round(savingsRatio * 100)}%) suggests potential for systematic investment. Recommended SIP: ₹8,000/month to begin wealth building.`
-          };
-        } else {
-          return {
-            allowed: false,
-            recommend: "BLOCKED - Increase Savings",
-            reason: `Current savings ratio (${Math.round(savingsRatio * 100)}%) below minimum 20%. Focus on increasing savings before starting SIP investments.`
-          };
-        }
-
-      case "Instant Personal Loan":
-        if (creditScore > 750 && debtToIncome < 0.4) {
-          return {
-            allowed: true,
-            recommend: "APPROVED - Premium Personal Loan",
-            reason: `Excellent credit score (${creditScore}) and low debt burden qualify for premium personal loan up to ₹5,00,000 at 10.5% APR.`
-          };
-        } else if (creditScore > 650 && debtToIncome < 0.6) {
-          return {
-            allowed: true,
-            recommend: "APPROVED - Standard Personal Loan",
-            reason: `Good credit profile supports personal loan up to ₹3,00,000 at 12.5% APR. Recommended for debt consolidation.`
-          };
-        } else {
-          return {
-            allowed: false,
-            recommend: "BLOCKED - High Risk Profile",
-            reason: `High debt-to-income ratio (${Math.round(debtToIncome * 100)}%) and credit score ${creditScore} indicate elevated risk. Reduce existing obligations first.`
-          };
-        }
-
-      default:
-        return {
-          allowed: false,
-          recommend: "UNKNOWN PRODUCT",
-          reason: "Product not recognized in risk assessment system."
-        };
-    }
-  };
-
-  const getDecision = async () => {
-    if (!summary?.customer) return;
-    // Use local reasoning logic instead of API call
-    const reasoning = getProductReasoning(selectedProduct, customerProfile);
-    setDecision(reasoning);
-  };
-
-  const loadSummary = async () => {
-    if (!isAuthenticated) {
-      setErr("🔒 Authentication required to access customer data");
-      return;
-    }
-
+  const enableBanker = async () => {
     try {
       const x = await api.getBankerToken();
-      setBankerToken(x.bankerToken || "");
-      setSummary({
-        customerName: customerProfile?.name || "Customer",
-        customerId: customerProfile?.customerId || "CUST-7721",
-        riskProfile: customerProfile?.riskLevel || "medium",
-        lastLogin: new Date().toLocaleDateString("en-IN"),
-        sessionSecure: true,
-        dataEncrypted: true
-      });
-      setErr("✅ Secure customer data loaded");
-    } catch (error) {
-      setErr("🔐 Failed to load customer summary - Please check permissions");
+      setBankerToken(x.bankerToken || activeToken || "banker-demo");
+      addAudit("banker_session_enabled", "ok");
+      setErr("");
+    } catch {
+      setErr("Unable to enable banker mode.");
     }
   };
 
-  useEffect(() => {
-    if (bankerToken) loadSummary();
-  }, [bankerToken]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!bankerToken) return;
-    const t = setTimeout(() => loadSummary(), 180);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    bankerToken,
-    customerProfile?.name,
-    customerProfile?.income,
-    customerProfile?.spending,
-    customerProfile?.loans,
-    customerProfile?.creditScore,
-    customerProfile?.riskLevel,
-  ]);
+  const applyOverride = () => {
+    addAudit("rm_override_applied", finalDecision.allowed ? "allowed" : "blocked", {
+      selectedProduct, overrideMode, confidence: finalDecision.confidence, note,
+    });
+  };
 
   return (
     <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:18 }}>
       <div style={{ fontSize:30, fontWeight:800 }}>⌁ <span style={{ background:"linear-gradient(135deg,#63b3ff,#34d399)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Banker / RM Co-Pilot</span></div>
       <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
         <button onClick={enableBanker} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#63b3ff", padding:"10px 14px", fontSize:12 }}>Enable Banker Role</button>
-        <button onClick={loadSummary} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.4)", background:"rgba(52,211,153,0.12)", color:"#34d399", padding:"10px 14px", fontSize:12 }}>GET /rm/customer-summary</button>
+        <button onClick={() => { setEngineConfig((p) => ({ ...p, riskTolerance: clamp(p.riskTolerance + 5, 10, 95) })); addAudit("rm_risk_tolerance_up", "ok"); }} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.4)", background:"rgba(52,211,153,0.12)", color:"#34d399", padding:"10px 14px", fontSize:12 }}>Increase Risk Appetite</button>
       </div>
-      {!bankerToken && <div style={{ color:"rgba(226,234,255,0.7)", fontSize:12 }}>Enable banker role to access RM-protected APIs.</div>}
       {!!err && <div style={{ color:"#f87171", fontSize:12 }}>{err}</div>}
-      <div style={{
-        clipPath:"polygon(4% 0, 96% 0, 100% 12%, 100% 88%, 96% 100%, 4% 100%, 0 88%, 0 12%)",
-        border:"1px solid rgba(99,179,255,0.25)",
-        background:"rgba(99,179,255,0.06)",
-        padding:"16px 18px",
-        display:"grid",
-        gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",
-        gap:12,
-      }}>
-        <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(99,179,255,0.85)", fontWeight:800, gridColumn:"1 / -1" }}>
-          Live Customer Inputs (shared with Cross‑Sell)
-        </div>
-        <label style={{ fontSize:12 }}>Name
-          <input value={customerProfile.name} onChange={e=>setCustomerProfile(p=>({...p, name:e.target.value}))} className="glass-input" style={{ width:"100%", marginTop:6, background:"rgba(3,7,18,0.7)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.14)", borderRadius:10, padding:"10px 12px" }} />
-        </label>
-        <label style={{ fontSize:12 }}>Income ₹{customerProfile.income.toLocaleString("en-IN")}
-          <input type="range" min={25000} max={220000} step={1000} value={customerProfile.income} onChange={e=>setCustomerProfile(p=>({...p, income:Number(e.target.value)}))} style={{ width:"100%" }} />
-        </label>
-        <label style={{ fontSize:12 }}>Spending ₹{customerProfile.spending.toLocaleString("en-IN")}
-          <input type="range" min={8000} max={160000} step={1000} value={customerProfile.spending} onChange={e=>setCustomerProfile(p=>({...p, spending:Number(e.target.value)}))} style={{ width:"100%" }} />
-        </label>
-        <label style={{ fontSize:12 }}>Loans ₹{customerProfile.loans.toLocaleString("en-IN")}
-          <input type="range" min={0} max={120000} step={1000} value={customerProfile.loans} onChange={e=>setCustomerProfile(p=>({...p, loans:Number(e.target.value)}))} style={{ width:"100%" }} />
-        </label>
-        <label style={{ fontSize:12 }}>Credit {customerProfile.creditScore}
-          <input type="range" min={500} max={900} step={1} value={customerProfile.creditScore} onChange={e=>setCustomerProfile(p=>({...p, creditScore:Number(e.target.value)}))} style={{ width:"100%" }} />
-        </label>
-        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          <div style={{ fontSize:12 }}>Risk Level</div>
-          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-            {["low","medium","high"].map((r)=>(
-              <button key={r} onClick={()=>setCustomerProfile(p=>({...p, riskLevel:r}))} style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:`1px solid ${customerProfile.riskLevel===r?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.2)"}`, color:customerProfile.riskLevel===r?"#34d399":"rgba(226,234,255,0.7)", padding:"7px 10px", fontSize:11 }}>{r}</button>
-            ))}
-          </div>
-        </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:14 }}>
+        <FeatureShard title="Live Customer Snapshot" color="#63b3ff" items={[
+          `Name: ${customerProfile.name || "Customer"}`,
+          `Income: ₹${customerProfile.income.toLocaleString("en-IN")}`,
+          `Spending: ₹${customerProfile.spending.toLocaleString("en-IN")}`,
+          `Loans: ₹${customerProfile.loans.toLocaleString("en-IN")}`,
+          `Credit: ${customerProfile.creditScore}`,
+          `Risk appetite: ${engineConfig.riskTolerance}`,
+        ]} />
+        <FeatureShard title="AI Suggestions (Mirrored)" color="#34d399" items={(liveResult.recommendations || []).map((r) => `${r.productName} • ${Math.round(r.confidence * 100)}%`)} />
       </div>
-      {summary?.customer && (
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }} className="sphere-row">
-          <FeatureShard title="Customer Snapshot" color="#63b3ff" items={Object.entries(summary.customer).map(([k,v]) => `${k}: ${v}`)} />
-          <FeatureShard title="Risk Flags + RM Recommendation" color="#fbbf24" items={[...(summary.flags || []).map((f)=>`${f.label}: ${f.value} (${f.color})`), summary.recommendation, `Why: ${summary.reason}`]} />
-        </div>
-      )}
       <div style={{ clipPath:"polygon(7% 0,100% 0,93% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.35)", background:"rgba(52,211,153,0.08)", padding:"16px 20px", display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
         <select value={selectedProduct} onChange={(e)=>setSelectedProduct(e.target.value)} style={{ background:"rgba(3,7,18,0.8)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.2)", padding:"8px 10px" }}>
-          <option>Secured Credit Card</option>
-          <option>Instant Personal Loan</option>
-          <option>Wealth Plus SIP</option>
+          {["Wealth Plus SIP","Secured Credit Card","Instant Personal Loan"].map((x)=><option key={x}>{x}</option>)}
         </select>
-        <button onClick={getDecision} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"9px 14px", fontSize:12 }}>POST /rm/product-decision</button>
+        <select value={overrideMode} onChange={(e)=>setOverrideMode(e.target.value)} style={{ background:"rgba(3,7,18,0.8)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.2)", padding:"8px 10px" }}>
+          <option value="follow_ai">Follow AI</option>
+          <option value="force_allow">Force Allow</option>
+          <option value="force_block">Force Block</option>
+        </select>
+        <label style={{ fontSize:12, color:"rgba(226,234,255,0.8)" }}>Confidence Adj {overrideRiskAdj >= 0 ? "+" : ""}{overrideRiskAdj}
+          <input type="range" min={-20} max={20} value={overrideRiskAdj} onChange={(e)=>setOverrideRiskAdj(Number(e.target.value))} style={{ width:130, marginLeft:8 }} />
+        </label>
+        <input value={note} onChange={(e)=>setNote(e.target.value)} placeholder="RM contextual note" className="glass-input" style={{ minWidth:220, flex:1, padding:"8px 10px", background:"rgba(3,7,18,0.72)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.2)", borderRadius:10 }} />
+        <button onClick={applyOverride} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"9px 14px", fontSize:12 }}>Apply Override</button>
       </div>
-      {decision && <FeatureShard title="Decision Reasoning" color={decision.allowed ? "#34d399" : "#f87171"} items={[`${decision.allowed ? "Allowed" : "Blocked"}: ${decision.recommendation}`, `Why ${decision.allowed ? "allowed" : "blocked"}: ${decision.reason}`]} />}
+      <FeatureShard title="Override Impact" color={finalDecision.allowed ? "#34d399" : "#f87171"} items={[
+        `${finalDecision.allowed ? "Allowed" : "Blocked"} • ${Math.round(finalDecision.confidence * 100)}%`,
+        `Why: ${finalDecision.reason}`,
+        `Compliance impact: ${finalDecision.impact}`,
+        note ? `RM Note: ${note}` : "RM Note: none",
+      ]} />
     </div>
   );
 }
 
-function PrivacyCompliance({ token, bankerToken }) {
+function PrivacyCompliance({
+  token, bankerToken, complianceState, setComplianceState, addAudit, customerProfile, engineConfig, auditTrail,
+}) {
   const [data, setData] = useState(fallbackCompliance);
+  const liveResult = useMemo(
+    () => evaluateCrossSell(customerProfile, engineConfig, complianceState),
+    [customerProfile, engineConfig, complianceState]
+  );
   const load = async () => {
     const d = await api.complianceStatus({ token: bankerToken || token });
     setData(d);
   };
   useEffect(() => { load(); }, [token, bankerToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const setConsent = (k, v) => {
+    setComplianceState((p) => ({ ...p, consent: { ...p.consent, [k]: v } }));
+    addAudit("consent_changed", v ? "enabled" : "disabled", { field: k });
+  };
+
   return (
     <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:18 }}>
       <div style={{ fontSize:30, fontWeight:800 }}>⛨ <span style={{ background:"linear-gradient(135deg,#fbbf24,#63b3ff)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Privacy & Compliance</span></div>
       <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>{(data.badges || []).map((b) => <div key={b} style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:"1px solid rgba(251,191,36,0.45)", background:"rgba(251,191,36,0.12)", color:"#fbbf24", padding:"8px 12px", fontSize:12 }}>{b}</div>)}</div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))", gap:14 }}>
-        <FeatureShard title="Data Used" color="#63b3ff" items={data.dataUsed || []} />
-        <FeatureShard title="Decision Logic" color="#34d399" items={[`Consent: ${data.consentStatus || "Unknown"}`, data.decisionExplainer || ""]} />
-        <FeatureShard title="Data Masking" color="#fbbf24" items={Object.entries(data.maskedPreview || {}).map(([k,v]) => `${k}: ${v}`)} />
+        <FeatureShard title="Consent & Data Use" color="#63b3ff" items={["income","spending","loans","creditScore","riskLevel"].map((k) => `${k}: ${complianceState.consent[k] ? "allowed" : "blocked"}`)} />
+        <FeatureShard title="RBAC + Policy" color="#34d399" items={[`Role: ${complianceState.role}`, `Data minimization: ${complianceState.dataMinimization ? "on" : "off"}`, `Strictness: ${complianceState.strictness}`]} />
+        <FeatureShard title="Immediate Impact" color="#fbbf24" items={[`Eligible products now: ${liveResult.impacts.eligibility}`, `Blocked by compliance: ${liveResult.blockedByCompliance.length}`, `Risk class: ${liveResult.impacts.riskClass}`]} />
+      </div>
+      <div style={{ clipPath:"polygon(7% 0,100% 0,93% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.35)", background:"rgba(99,179,255,0.08)", padding:"16px 20px", display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:10 }}>
+        {["income","spending","loans","creditScore","riskLevel"].map((k) => (
+          <label key={k} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12 }}><input type="checkbox" checked={complianceState.consent[k]} onChange={(e)=>setConsent(k, e.target.checked)} />{k} consent</label>
+        ))}
+        <label style={{ display:"flex", alignItems:"center", gap:8, fontSize:12 }}><input type="checkbox" checked={complianceState.dataMinimization} onChange={(e)=>{ setComplianceState((p) => ({ ...p, dataMinimization: e.target.checked })); addAudit("data_minimization", e.target.checked ? "on" : "off"); }} />Data minimization</label>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          {["user", "banker", "compliance"].map((r) => (
+            <button
+              key={r}
+              onClick={() => { setComplianceState((p) => ({ ...p, role: r })); addAudit("rbac_role_changed", "ok", { role: r }); }}
+              style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:`1px solid ${complianceState.role===r?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.22)"}`, color:complianceState.role===r?"#34d399":"rgba(226,234,255,0.7)", padding:"7px 10px", fontSize:11 }}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+        <label style={{ fontSize:12 }}>Policy strictness {complianceState.strictness}
+          <input type="range" min={20} max={95} value={complianceState.strictness} onChange={(e)=>{ const v = Number(e.target.value); setComplianceState((p) => ({ ...p, strictness: v })); addAudit("policy_strictness", "updated", { value: v }); }} style={{ width:"100%" }} />
+        </label>
       </div>
       <div style={{ position:"relative", marginTop:4 }}>
         <div aria-hidden style={{
@@ -2686,12 +2580,12 @@ function PrivacyCompliance({ token, bankerToken }) {
           pointerEvents:"none",
         }} />
         <div style={{ position:"relative", padding:"18px 22px", paddingLeft:26 }}>
-          <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.11em", color:"#63b3ff", marginBottom:8, lineHeight:1.3 }}>Audit Logs</div>
-          {(data.auditLogs || []).length === 0 ? (
+          <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.11em", color:"#63b3ff", marginBottom:8, lineHeight:1.3 }}>Audit Logs (Realtime + API)</div>
+          {[...auditTrail, ...(data.auditLogs || [])].slice(0, 14).length === 0 ? (
             <div style={{ fontSize:13, color:"rgba(226,234,255,0.72)" }}>No logs yet. Generate feature actions first.</div>
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {data.auditLogs.map((l,i)=>(
+              {[...auditTrail, ...(data.auditLogs || [])].slice(0, 14).map((l,i)=>(
                 <div key={i} style={{
                   border:"1px solid rgba(255,255,255,0.2)",
                   background:"rgba(3,7,18,0.72)",
@@ -2700,7 +2594,7 @@ function PrivacyCompliance({ token, bankerToken }) {
                   color:"rgba(226,234,255,0.86)",
                   borderRadius:10,
                 }}>
-                  {l.ts} • {l.role} • {l.action} • {l.result}
+                  {(l.ts || new Date().toISOString())} • {(l.role || complianceState.role)} • {(l.action || "event")} • {(l.result || "ok")}
                 </div>
               ))}
             </div>
@@ -2712,16 +2606,16 @@ function PrivacyCompliance({ token, bankerToken }) {
   );
 }
 
-function CrossSellEngine({ token, customerProfile, setCustomerProfile }) {
-  return <SmartCrossSell token={token} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />;
+function CrossSellEngine({ customerProfile, setCustomerProfile, engineConfig, complianceState, addAudit }) {
+  return <SmartCrossSell customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} engineConfig={engineConfig} complianceState={complianceState} addAudit={addAudit} />;
 }
 
-function RMCopilot({ token, bankerToken, setBankerToken, customerProfile, setCustomerProfile }) {
-  return <BankerRMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />;
+function RMCopilot({ token, bankerToken, setBankerToken, customerProfile, setCustomerProfile, engineConfig, setEngineConfig, complianceState, addAudit }) {
+  return <BankerRMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} engineConfig={engineConfig} setEngineConfig={setEngineConfig} complianceState={complianceState} addAudit={addAudit} />;
 }
 
-function ComplianceLayer({ token, bankerToken }) {
-  return <PrivacyCompliance token={token} bankerToken={bankerToken} />;
+function ComplianceLayer({ token, bankerToken, complianceState, setComplianceState, addAudit, customerProfile, engineConfig, auditTrail }) {
+  return <PrivacyCompliance token={token} bankerToken={bankerToken} complianceState={complianceState} setComplianceState={setComplianceState} addAudit={addAudit} customerProfile={customerProfile} engineConfig={engineConfig} auditTrail={auditTrail} />;
 }
 
 // ── SETTINGS ──────────────────────────────────────────────────
@@ -3830,7 +3724,19 @@ function Shell({ token, initialBankerToken = "" }) {
   const [col, setCol]   = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [welcomePlayed, setWelcomePlayed] = useState(false);
+  const [engineConfig, setEngineConfig] = useState({ riskTolerance: 55 });
+  const [complianceState, setComplianceState] = useState({
+    role: "user",
+    dataMinimization: true,
+    strictness: 70,
+    consent: { income: true, spending: true, loans: true, creditScore: true, riskLevel: true },
+  });
+  const [auditTrail, setAuditTrail] = useState([]);
   const mobile = useIsMobile();
+
+  const addAudit = (action, result = "ok", meta = {}) => {
+    setAuditTrail((p) => [{ ts: new Date().toISOString(), role: complianceState.role, action, result, ...meta }, ...p].slice(0, 40));
+  };
 
   // Welcome voice message
   const playWelcomeMessage = () => {
@@ -3884,9 +3790,9 @@ function Shell({ token, initialBankerToken = "" }) {
     home: <Home user={user} updates={updates} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />,
     astrofin: <AstroFin updates={updates} customerProfile={customerProfile} />,
     creditai: <CreditScore user={user} />,
-    crosssell: <CrossSellEngine token={token} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />,
-    rmcopilot: <RMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />,
-    compliance: <ComplianceLayer token={token} bankerToken={bankerToken} />,
+    crosssell: <CrossSellEngine customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} engineConfig={engineConfig} complianceState={complianceState} addAudit={addAudit} />,
+    rmcopilot: <RMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} engineConfig={engineConfig} setEngineConfig={setEngineConfig} complianceState={complianceState} addAudit={addAudit} />,
+    compliance: <ComplianceLayer token={token} bankerToken={bankerToken} complianceState={complianceState} setComplianceState={setComplianceState} addAudit={addAudit} customerProfile={customerProfile} engineConfig={engineConfig} auditTrail={auditTrail} />,
     loan: <Loan />,
     fraud: <Fraud />,
     ai: <AskAstro updates={updates} customerProfile={customerProfile} />,
