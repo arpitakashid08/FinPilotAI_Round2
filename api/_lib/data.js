@@ -132,9 +132,23 @@ export function fallbackReply(message = "", profile = {}, language = "en") {
   const seed = (q.length + (creditScore || 0)) % variants.length;
   const pre = variants[seed];
 
-  if (q.includes("financial health") || q.includes("health")) {
-    return `${pre} Current snapshot: income ₹${income.toLocaleString("en-IN") || "0"}, savings ₹${savings.toLocaleString("en-IN") || "0"}, EMI ratio ${Math.round(emiRatio * 100)}%, credit ${creditScore || "n/a"}. Focus on reducing EMI ratio below 35% and keeping credit utilisation controlled.`;
+  if (language === "mr") {
+    if (q.includes("financial health") || q.includes("health")) return `तुमची आर्थिक स्थिती: उत्पन्न ₹${income.toLocaleString("en-IN")}, बचत ₹${savings.toLocaleString("en-IN")}, EMI अनुपात ${Math.round(emiRatio * 100)}%, क्रेडिट स्कोअर ${creditScore}. EMI 35% खाली ठेवणे आणि अनावश्यक कर्ज टाळणे महत्त्वाचे आहे.`;
+    if (q.includes("loan") || q.includes("emi")) return "EMI 35% च्या आसपास ठेवा आणि जास्त व्याजाचे कर्ज आधी फेडा.";
+    if (q.includes("credit") || q.includes("score")) return "क्रेडिट स्कोअर वाढवण्यासाठी वेळेवर पेमेंट करा, उपयोग कमी ठेवा आणि वारंवार चौकशी टाळा.";
+    if (q.includes("fraud") || q.includes("alert")) return "तत्काळ अलर्ट सुरू ठेवा, व्यवहार मर्यादा घट्ट ठेवा आणि OTP/PIN शेअर करू नका.";
+    if (q.includes("stock") || q.includes("market") || q.includes("invest")) return "गुंतवणूक उद्दिष्टानुसार विभागा आणि एका थीममध्ये एकत्रित जोखीम टाळा.";
+    return "तुमचे उत्पन्न, EMI आणि उद्दिष्टे सांगा; मी अधिक अचूक योजना देईन.";
   }
+  if (language === "hi") {
+    if (q.includes("financial health") || q.includes("health")) return `आपकी वित्तीय स्थिति: आय ₹${income.toLocaleString("en-IN")}, बचत ₹${savings.toLocaleString("en-IN")}, EMI अनुपात ${Math.round(emiRatio * 100)}%, क्रेडिट स्कोर ${creditScore}. EMI 35% से नीचे रखें।`;
+    if (q.includes("loan") || q.includes("emi")) return "EMI को नियंत्रित रखें और उच्च ब्याज वाले कर्ज को पहले चुकाएँ।";
+    if (q.includes("credit") || q.includes("score")) return "स्कोर सुधारने के लिए समय पर भुगतान करें, उपयोग कम रखें और नई पूछताछ कम करें।";
+    if (q.includes("fraud") || q.includes("alert")) return "रीयल-टाइम अलर्ट चालू रखें और OTP/PIN कभी साझा न करें।";
+    if (q.includes("stock") || q.includes("market") || q.includes("invest")) return "लक्ष्य-आधारित एसेट एलोकेशन अपनाएँ और एक ही थीम में अधिक निवेश न करें।";
+    return "अपनी आय, EMI और लक्ष्य बताइए; मैं बेहतर योजना दूँगा।";
+  }
+  if (q.includes("financial health") || q.includes("health")) return `${pre} Current snapshot: income ₹${income.toLocaleString("en-IN") || "0"}, savings ₹${savings.toLocaleString("en-IN") || "0"}, EMI ratio ${Math.round(emiRatio * 100)}%, credit ${creditScore || "n/a"}. Focus on reducing EMI ratio below 35% and keeping credit utilisation controlled.`;
   if (q.includes("loan") || q.includes("emi")) return `${pre} Keep EMI ratio near or below 35%, and prepay highest-interest debt first.`;
   if (q.includes("credit") || q.includes("score")) return `${pre} Improve score with on-time payments, low utilization, and fewer fresh hard inquiries.`;
   if (q.includes("fraud") || q.includes("alert")) return `${pre} Enable real-time alerts, tighten transfer limits, and never share OTP/PIN.`;

@@ -909,9 +909,9 @@ function TopBar({ active, user, mobileMenuOpen, setMobileMenuOpen }) {
 // ── DATA LABEL (floating near sphere) ────────────────────────
 function OrbitLabel({ value, label, color, x, y }) {
   return (
-    <div className="orbit-label" style={{ position:"absolute", left:x, top:y, pointerEvents:"none" }}>
+    <div className="orbit-label" style={{ position:"absolute", left:x, top:y, pointerEvents:"none", zIndex:4, minWidth:110 }}>
       <div style={{ fontSize:18, fontWeight:800, fontFamily:"'JetBrains Mono', monospace", color, filter:`drop-shadow(0 0 8px ${color})` }}>{value}</div>
-      <div style={{ fontSize:10, color:"rgba(226,234,255,0.4)", textTransform:"uppercase", letterSpacing:"0.1em", marginTop:2 }}>{label}</div>
+      <div style={{ fontSize:10, color:"rgba(226,234,255,0.52)", textTransform:"uppercase", letterSpacing:"0.08em", marginTop:2, whiteSpace:"nowrap" }}>{label}</div>
     </div>
   );
 }
@@ -922,8 +922,8 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
   const [tempIncome, setTempIncome] = useState(customerProfile.income);
   
   const metrics = [
-    { value:`₹${customerProfile.income.toLocaleString("en-IN")}`,   label:"Income",    color:"#34d399", x:"68%", y:"12%" },
-    { value:`₹${customerProfile.spending.toLocaleString("en-IN")}`,  label:"Spending",  color:"#fbbf24", x:"72%", y:"52%" },
+    { value:`₹${customerProfile.income.toLocaleString("en-IN")}`,   label:"Income",    color:"#34d399", x:"63%", y:"12%" },
+    { value:`₹${customerProfile.spending.toLocaleString("en-IN")}`,  label:"Spending",  color:"#fbbf24", x:"62%", y:"52%" },
     { value:`₹${(customerProfile.income - customerProfile.spending).toLocaleString("en-IN")}`,  label:"Cash Flow", color:"#63b3ff", x:"5%",  y:"20%" },
     { value:`₹${customerProfile.loans.toLocaleString("en-IN")}`,label:"Liabilities",color:"#f87171",x:"2%",y:"62%"},
   ];
@@ -1684,7 +1684,8 @@ function AskAstro({ updates, customerProfile }) {
     rec.continuous = false;
     rec.interimResults = true;
     rec.maxAlternatives = 1;
-    rec.lang = lang === "mr" ? "mr-IN" : lang === "hi" ? "hi-IN" : "en-US";
+    const langMap = { mr: "mr-IN", hi: "hi-IN", en: "en-US" };
+    rec.lang = langMap[lang] || "en-US";
 
     rec.onresult = (event) => {
       let finalText = "";
@@ -1702,7 +1703,17 @@ function AskAstro({ updates, customerProfile }) {
       }
     };
 
-    rec.onerror = () => setIsListening(false);
+    rec.onerror = (event) => {
+      // Some browsers may not support mr-IN reliably; fallback to hi-IN for Marathi capture.
+      if (event?.error === "language-not-supported" && lang === "mr") {
+        try {
+          rec.lang = "hi-IN";
+          rec.start();
+          return;
+        } catch {}
+      }
+      setIsListening(false);
+    };
     rec.onend = () => setIsListening(false);
     recognitionRef.current = rec;
 
@@ -1723,8 +1734,12 @@ function AskAstro({ updates, customerProfile }) {
     setChatErr("");
     
     try {
-      const response = await api.voiceReply({ transcript: q, language: lang, profile: customerProfile });
-      const text = response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang);
+      let response = await api.voiceReply({ transcript: q, language: lang, profile: customerProfile });
+      let text = response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang);
+      if (lang === "mr" && /[a-zA-Z]{5,}/.test(text)) {
+        const r2 = await api.askAstro({ message: `कृपया उत्तर फक्त मराठीत द्या: ${q}`, language: "mr", profile: customerProfile });
+        text = r2.reply || text;
+      }
       setMsgs(m => [...m, { role:"ai", text }]);
       speakText(text);
     } catch {
@@ -1825,8 +1840,13 @@ function AskAstro({ updates, customerProfile }) {
       let response;
       
       response = await api.askAstro({ message: q, language: lang, profile: customerProfile });
+      let finalReply = response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang);
+      if (lang === "mr" && /[a-zA-Z]{5,}/.test(finalReply)) {
+        const r2 = await api.askAstro({ message: `कृपया उत्तर फक्त मराठीत द्या: ${q}`, language: "mr", profile: customerProfile });
+        finalReply = r2.reply || finalReply;
+      }
       
-      setMsgs(m => [...m, { role:"ai", text: response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang) }]);
+      setMsgs(m => [...m, { role:"ai", text: finalReply }]);
     } catch {
       setChatErr(translateText("Ask Astro is temporarily unavailable. Please retry.", lang));
     } finally {
@@ -3237,11 +3257,11 @@ function HexNews({ title, cat, time, sentiment, delay }) {
   const borderColor = sentiment === "bullish" ? "#34d399" : sentiment === "bearish" ? "#f87171" : "#63b3ff";
   return (
     <div style={{
-      position:"relative", width:280, minHeight:178,
-      clipPath:"polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%)",
+      position:"relative", width:292, minHeight:188,
+      clipPath:"polygon(16% 0%, 84% 0%, 100% 50%, 84% 100%, 16% 100%, 0% 50%)",
       background:"rgba(255,255,255,0.045)",
       border:`1px solid ${borderColor}45`,
-      padding:"24px 18px", display:"flex", alignItems:"center", justifyContent:"center",
+      padding:"26px 20px", display:"flex", alignItems:"center", justifyContent:"center",
       animation:`fadeUp 0.4s ease ${delay}s both`,
       transition:"all 0.2s",
       boxShadow:`0 0 22px ${borderColor}22`,
@@ -3249,14 +3269,14 @@ function HexNews({ title, cat, time, sentiment, delay }) {
       onMouseEnter={e => { e.currentTarget.style.background = `${borderColor}10`; e.currentTarget.style.borderColor = `${borderColor}60`; }}
       onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = `${borderColor}30`; }}
     >
-      <div style={{ width:"78%", minWidth:0 }}>
-        <div style={{ fontSize:13, textTransform:"uppercase", letterSpacing:"0.14em", color:`${borderColor}`, marginBottom:10, fontWeight:800 }}>{cat}</div>
+      <div style={{ width:"70%", minWidth:0, margin:"0 auto" }}>
+        <div style={{ fontSize:14, textTransform:"uppercase", letterSpacing:"0.09em", color:`${borderColor}`, marginBottom:10, fontWeight:800, whiteSpace:"nowrap" }}>{cat}</div>
         <div style={{
-          fontSize:21, lineHeight:1.42, marginBottom:10, fontWeight:800, color:"#eef6ff",
+          fontSize:20, lineHeight:1.4, marginBottom:10, fontWeight:800, color:"#eef6ff",
           textShadow:"0 0 10px rgba(0,0,0,0.35)",
           display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden",
         }}>{title}</div>
-        <div style={{ fontSize:13, color:"rgba(226,234,255,0.7)", fontFamily:"'JetBrains Mono', monospace", fontWeight:600 }}>{time}</div>
+        <div style={{ fontSize:13, color:"rgba(226,234,255,0.8)", fontFamily:"'JetBrains Mono', monospace", fontWeight:600, whiteSpace:"nowrap" }}>{time}</div>
       </div>
     </div>
   );
@@ -3605,20 +3625,28 @@ function VoiceAssistant() {
 
 // ── CREDIT SCORE IMPROVER PAGE ────────────────────────────────
 function CreditScore({ user }) {
-  const currentScore = 720;
-  const targetScore = 800;
   const maxScore = 900;
+  const baseScore = 692;
+  const actionDefs = [
+    { id: "pay_on_time", task: "Pay bills on time", points: 18, color: "#34d399", why: "Payment history has the highest score weight.", need: "Enable auto-pay and clear dues before due date." },
+    { id: "reduce_util", task: "Reduce utilization below 30%", points: 24, color: "#63b3ff", why: "Lower utilization improves credit behavior.", need: "Repay revolving balances or increase limit safely." },
+    { id: "avoid_new", task: "Avoid new hard inquiries", points: 10, color: "#fbbf24", why: "Too many inquiries signal credit hunger.", need: "Pause fresh loan/card applications this quarter." },
+    { id: "fix_errors", task: "Dispute report errors", points: 8, color: "#a78bfa", why: "Incorrect entries can suppress score unfairly.", need: "Raise bureau dispute with proof documents." },
+    { id: "credit_mix", task: "Improve credit mix quality", points: 12, color: "#22d3ee", why: "Balanced installment + revolving mix helps.", need: "Keep only useful accounts active and healthy." },
+  ];
+  const [selectedAction, setSelectedAction] = useState(actionDefs[0].id);
+  const [activeActions, setActiveActions] = useState(() => ({ pay_on_time: true, reduce_util: false, avoid_new: true, fix_errors: false, credit_mix: false }));
+  const [scenario, setScenario] = useState("balanced");
+
+  const scenarioAdj = scenario === "aggressive" ? 12 : scenario === "slow" ? -8 : 0;
+  const totalImpact = actionDefs.reduce((acc, a) => acc + (activeActions[a.id] ? a.points : 0), 0);
+  const currentScore = clamp(baseScore + totalImpact + scenarioAdj, 300, maxScore);
+  const targetScore = clamp(currentScore + 45, 300, maxScore);
   const progress = (currentScore - 300) / (maxScore - 300);
   const targetProgress = (targetScore - 300) / (maxScore - 300);
-
-  const actions = [
-    { task: "Pay credit card bills on time", impact: "+15 pts", status: "pending", color: "#fbbf24" },
-    { task: "Reduce credit utilization to <30%", impact: "+20 pts", status: "in-progress", color: "#63b3ff" },
-    { task: "Don't apply for new credit", impact: "+10 pts", status: "done", color: "#34d399" },
-    { task: "Check for report errors", impact: "+5 pts", status: "pending", color: "#fbbf24" },
-    { task: "Maintain old credit accounts", impact: "+8 pts", status: "done", color: "#34d399" },
-    { task: "Diversify credit mix", impact: "+12 pts", status: "in-progress", color: "#63b3ff" },
-  ];
+  const monthlyGain = Math.max(2, Math.round((targetScore - currentScore) / 6));
+  const projection = Array.from({ length: 6 }, (_, i) => clamp(currentScore + monthlyGain * (i + 1), 300, maxScore));
+  const selected = actionDefs.find((a) => a.id === selectedAction) || actionDefs[0];
 
   return (
     <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:32 }}>
@@ -3663,22 +3691,38 @@ function CreditScore({ user }) {
 
         {/* Action items */}
         <div style={{ flex:1, minWidth:220, display:"flex", flexDirection:"column", gap:12 }}>
-          <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>AI Recommendations</div>
-          {actions.map((a, i) => (
-            <div key={i} style={{
+          <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>AI Recommendations (Interactive)</div>
+          {actionDefs.map((a, i) => (
+            <button key={a.id} onClick={() => setSelectedAction(a.id)} style={{
               display:"flex", alignItems:"center", gap:12, padding:"12px 16px",
               background:`${a.color}08`, border:`1px solid ${a.color}20`, borderLeft:`3px solid ${a.color}`,
               borderRadius:12, animation:`fadeUp 0.4s ease ${i*0.1}s both`,
+              textAlign:"left",
             }}>
               <div style={{ width:6, height:6, borderRadius:"50%", background:a.color, boxShadow:`0 0 6px ${a.color}`, flexShrink:0 }} />
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:13, fontWeight:600, marginBottom:2 }}>{a.task}</div>
-                <div style={{ fontSize:10, color:"rgba(226,234,255,0.35)", fontFamily:"'JetBrains Mono', monospace" }}>Impact: {a.impact}</div>
+                <div style={{ fontSize:10, color:"rgba(226,234,255,0.35)", fontFamily:"'JetBrains Mono', monospace" }}>Impact: +{a.points} pts</div>
               </div>
-              <div style={{ fontSize:10, padding:"4px 10px", borderRadius:20, background:`${a.color}20`, color:a.color, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em" }}>
-                {a.status === "done" ? "✓" : a.status === "in-progress" ? "⟳" : "○"}
+              <div style={{ fontSize:10, padding:"4px 10px", borderRadius:20, background:`${a.color}20`, color:a.color, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", border:selectedAction===a.id?`1px solid ${a.color}`:"none" }}>
+                {activeActions[a.id] ? "✓ Active" : "○ Inactive"}
               </div>
-            </div>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ clipPath:"polygon(5% 0,95% 0,100% 20%,100% 80%,95% 100%,5% 100%,0 80%,0 20%)", border:`1px solid ${selected.color}55`, background:`${selected.color}12`, padding:"14px 18px", display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ fontSize:13, fontWeight:700 }}>{selected.task}</div>
+        <div style={{ fontSize:12, color:"rgba(226,234,255,0.8)" }}>Why it matters: {selected.why}</div>
+        <div style={{ fontSize:12, color:"rgba(226,234,255,0.8)" }}>Required action: {selected.need}</div>
+        <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+          <button onClick={() => setActiveActions((p) => ({ ...p, [selected.id]: !p[selected.id] }))} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:`1px solid ${selected.color}80`, background:`${selected.color}24`, color:"#e2eaff", padding:"8px 12px", fontSize:12 }}>
+            {activeActions[selected.id] ? "Mark Pending" : "Mark Completed"}
+          </button>
+          {["slow","balanced","aggressive"].map((s) => (
+            <button key={s} onClick={() => setScenario(s)} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:`1px solid ${scenario===s?"rgba(99,179,255,0.8)":"rgba(255,255,255,0.25)"}`, background:scenario===s?"rgba(99,179,255,0.18)":"rgba(255,255,255,0.06)", color:"#e2eaff", padding:"8px 12px", fontSize:12 }}>
+              {s} scenario
+            </button>
           ))}
         </div>
       </div>
@@ -3687,7 +3731,7 @@ function CreditScore({ user }) {
       <div>
         <div style={{ fontWeight:700, fontSize:14, marginBottom:16 }}>6-Month Projection</div>
         <div style={{ display:"flex", gap:8, alignItems:"flex-end", height:140 }}>
-          {[720, 735, 752, 768, 784, 800].map((score, i) => (
+          {projection.map((score, i) => (
             <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
               <div style={{ fontSize:11, color:"rgba(226,234,255,0.5)", fontFamily:"'JetBrains Mono', monospace" }}>{score}</div>
               <div style={{
