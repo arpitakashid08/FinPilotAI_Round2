@@ -5,9 +5,14 @@ const router = Router();
 
 router.post("/voice/reply", async (req, res) => {
   const transcript = `${req.body?.transcript || ""}`.toLowerCase();
+  const language = `${req.body?.language || "en"}`;
+  const langLabel = language === "mr" ? "Marathi" : language === "hi" ? "Hindi" : "English";
+  const profile = req.body?.profile || {};
   let reply = "Current signal is balanced. Consider risk-adjusted exposure instead of concentrated entries.";
 
-  const prompt = `User asked by voice: ${transcript}\nReply in 1-2 short sentences with practical fintech guidance.`;
+  const prompt = `User asked by voice (${langLabel}): ${transcript}
+Customer context: income ${profile?.income || "n/a"}, spending ${profile?.spending || "n/a"}, loans ${profile?.loans || "n/a"}, creditScore ${profile?.creditScore || "n/a"}.
+Reply in ${langLabel} with concise and practical fintech guidance.`;
   const generated = await generateAssistantReply(prompt);
   if (generated.reply) {
     reply = generated.reply;

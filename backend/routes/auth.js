@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { mockUser } from "../data/mockDb.js";
-import { issueToken } from "../utils/security.js";
+import { issueToken, verifyToken } from "../utils/security.js";
 
 const router = Router();
 
@@ -33,7 +33,12 @@ router.post("/auth/signup", (_req, res) => {
 });
 
 router.get("/auth/profile", (_req, res) => {
-  return res.json(mockUser);
+  const auth = _req.headers?.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  const claims = verifyToken(token);
+  const email = claims?.email || mockUser.email;
+  const name = `${email}`.split("@")[0].replace(/[._-]+/g, " ").trim().split(" ").filter(Boolean).map((x) => x.charAt(0).toUpperCase() + x.slice(1)).join(" ") || "FinPilot User";
+  return res.json({ ...mockUser, email, name });
 });
 
 export default router;

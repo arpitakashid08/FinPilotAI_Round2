@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
-const fallbackProfile = { name: "", email: "user@finpilot.ai", balance: 124500, riskScore: 0.28, lastLogin: "Feb 17, 2026", insurances: 2, licPolicies: 1, investments: 4 };
+const fallbackProfile = { name: "FinPilot User", email: "user@finpilot.ai", balance: 124500, riskScore: 0.28, lastLogin: "Feb 17, 2026", insurances: 2, licPolicies: 1, investments: 4 };
 const fallbackUpdates = {
   latestFinance: [
     { title: "RBI hints at cautious rate path amid inflation softening", cat: "Macro", time: "2h ago", sentiment: "neutral" },
@@ -164,6 +164,21 @@ function fallbackAstroReply(message = "") {
   return "Think in terms of cash flow: map income, essential spends, EMIs, and goals, then automate savings on salary day into 2–3 labelled buckets. This makes it easier to stay under a safe EMI limit, fund near-term goals, and still invest long term without surprises.";
 }
 
+function dynamicFallbackUpdates() {
+  const now = Date.now();
+  const base = JSON.parse(JSON.stringify(fallbackUpdates));
+  const hour = 60 * 60 * 1000;
+  const offsets = [1, 2, 4].map((x, i) => x + Math.round((now / hour + i) % 3));
+  base.latestFinance = base.latestFinance.map((x, i) => ({ ...x, time: `${offsets[i]}h ago` }));
+  const shift = ((Math.sin(now / (12 * 60 * 1000)) + 1) / 2) * 0.9 - 0.45;
+  base.stockAlerts = base.stockAlerts.map((s, i) => {
+    const delta = Number((shift + (i - 1) * 0.2).toFixed(2));
+    const change = Number((s.change + delta).toFixed(2));
+    return { ...s, change, color: change >= 0 ? "#34d399" : "#f87171" };
+  });
+  return base;
+}
+
 const api = {
   login: async ({ email = "", password = "" } = {}) =>
     callApi("/auth/login", {
@@ -187,19 +202,19 @@ const api = {
     callApi("/auth/profile", {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     }, fallbackProfile),
-  getUpdates: async () => callApi("/updates", {}, fallbackUpdates),
+  getUpdates: async () => callApi("/updates", {}, () => dynamicFallbackUpdates()),
   getFeatureModules: async () => callApi("/features/modules", {}, fallbackFeatureModules),
-  voiceReply: async ({ transcript = "" }) =>
+  voiceReply: async ({ transcript = "", language = "en", profile = {} }) =>
     callApi("/voice/reply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript }),
-    }, { transcript, reply: "Voice noted. Market remains mixed with selective upside in high-quality assets." }),
-  askAstro: async ({ message = "", language = "en" }) =>
+      body: JSON.stringify({ transcript, language, profile }),
+    }, { transcript, reply: fallbackAstroReply(transcript) }),
+  askAstro: async ({ message = "", language = "en", profile = {} }) =>
     callApi("/ai/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, language }),
+      body: JSON.stringify({ message, language, profile }),
     }, { reply: fallbackAstroReply(message) }),
   getBankerToken: async () =>
     callApi("/auth/banker-token", { method: "POST" }, { bankerToken: "demo-banker-token" }),
@@ -229,7 +244,7 @@ const api = {
   rmProductDecision: async ({ bankerToken, payload }) =>
     callApi("/rm/product-decision", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...(bankerToken ? { Authorization: `Bearer ${token}` } : {}) },
+      headers: { "Content-Type": "application/json", ...(bankerToken ? { Authorization: `Bearer ${bankerToken}` } : {}) },
       body: JSON.stringify(payload),
     }, fallbackRmDecision),
   complianceStatus: async ({ token }) =>
@@ -930,7 +945,7 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
           FINANCIAL OVERVIEW · <span style={{ animation:"blink 1.2s step-end infinite" }}>●</span> LIVE
         </div>
         <div className="hero-name" style={{ fontSize:34, fontWeight:800, lineHeight:1.1 }}>
-          Welcome back, <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{user.name}</span>
+          Welcome back, <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{user.name.split(" ")[0]}</span>
         </div>
       </div>
 
@@ -948,7 +963,7 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
         <div style={{ flex:1, minWidth:200, display:"flex", flexDirection:"column", gap:20 }}>
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-              <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(226,234,255,0.35)" }}>Portfolio Balance</div>
+              <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(226,234,255,0.35)" }}>Monthly Income</div>
               <button
                 onClick={handleIncomeEdit}
                 style={{
@@ -1025,7 +1040,7 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
             ) : (
               <div style={{ position:"relative" }}>
                 <div className="balance-num" style={{ fontSize:44, fontWeight:800, fontFamily:"'JetBrains Mono', monospace", background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
-                  ₹{user.balance.toLocaleString("en-IN")}
+                  ₹{customerProfile.income.toLocaleString("en-IN")}
                 </div>
                 <button
                   onClick={handleIncomeEdit}
@@ -1321,6 +1336,12 @@ function Loan() {
   const [months, setMon] = useState(24);
   const [rate, setRate]  = useState(9);
   const [res, setRes]    = useState(null);
+  const [insurances, setInsurances] = useState(["Health Shield - ₹1,200/mo"]);
+  const [licPolicies, setLicPolicies] = useState(["Jeevan Anand - ₹12,500/yr"]);
+  const [investments, setInvestments] = useState(["Index SIP - ₹5,000/mo"]);
+  const [newInsurance, setNewInsurance] = useState("");
+  const [newLic, setNewLic] = useState("");
+  const [newInvestment, setNewInvestment] = useState("");
   const [fxAmount, setFxAmount] = useState(100000);
   const [fxFrom, setFxFrom] = useState("INR");
   const [fxTo, setFxTo] = useState("USD");
@@ -1406,6 +1427,53 @@ function Loan() {
             </div>
           )}
         </div>
+      </div>
+      <div style={{ marginTop:24, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:12 }}>
+        {[
+          {
+            title: "Insurance Policies",
+            color: "#34d399",
+            items: insurances,
+            value: newInsurance,
+            onChange: setNewInsurance,
+            onAdd: () => { if (newInsurance.trim()) { setInsurances((x) => [...x, newInsurance.trim()]); setNewInsurance(""); } },
+          },
+          {
+            title: "LIC Policies",
+            color: "#fbbf24",
+            items: licPolicies,
+            value: newLic,
+            onChange: setNewLic,
+            onAdd: () => { if (newLic.trim()) { setLicPolicies((x) => [...x, newLic.trim()]); setNewLic(""); } },
+          },
+          {
+            title: "Investments",
+            color: "#a78bfa",
+            items: investments,
+            value: newInvestment,
+            onChange: setNewInvestment,
+            onAdd: () => { if (newInvestment.trim()) { setInvestments((x) => [...x, newInvestment.trim()]); setNewInvestment(""); } },
+          },
+        ].map((block) => (
+          <div key={block.title} style={{ clipPath:"polygon(6% 0,94% 0,100% 18%,100% 82%,94% 100%,6% 100%,0 82%,0 18%)", border:`1px solid ${block.color}55`, background:`${block.color}12`, padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ fontSize:12, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.12em", color:block.color }}>{block.title}</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              {block.items.map((item, idx) => (
+                <div key={`${block.title}-${idx}`} style={{ fontSize:12, color:"rgba(226,234,255,0.85)", lineHeight:1.45 }}>{item}</div>
+              ))}
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <input
+                value={block.value}
+                onChange={(e) => block.onChange(e.target.value)}
+                placeholder={`Add ${block.title.toLowerCase()}`}
+                className="glass-input"
+                style={{ flex:1, padding:"9px 11px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.18)", borderRadius:10, color:"#e2eaff", fontSize:12 }}
+              />
+              <button onClick={block.onAdd} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:`1px solid ${block.color}80`, background:`${block.color}26`, color:"#e2eaff", padding:"8px 12px", fontSize:11, fontWeight:700 }}>Add</button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1579,50 +1647,50 @@ function AskAstro({ updates, customerProfile }) {
   const translateText = (text, targetLang) => {
     const translations = {
       mr: {
-        "Hi {userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.":
-          "नमस्कार {userName}! मी ॲस्ट्रो आहे, तुमचा फिनपायलट एआय सहकारी. मला तुमच्या कर्ज, जोखीम प्रोफाइल, फसवणूक सूचना किंवा गुंतवणूक धोरणाबद्दल विचारा.",
+        "Hi {userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.": 
+          "\u0928\u092e\u0938\u094d\u0915\u093e\u0930 {userName}! \u092e\u0940 \u0906\u0938\u094d\u091f\u094d\u0930\u094b \u0906\u0939\u0947, \u0924\u0941\u092e\u091a\u094d\u092f\u093e \u092b\u093f\u0928\u092a\u093e\u092f\u0932\u091f \u090f\u0906\u090f \u0938\u0939-\u092a\u093e\u092f\u0932\u091f. \u092e\u0932\u093e \u0924\u0941\u092e\u091a\u094d\u092f\u093e \u0915\u0930\u094d\u091c\u093e\u0902\u092c\u0926\u094d\u0926\u0932, \u091c\u094b\u0916\u092e \u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932\u092c\u0926\u094d\u0926\u0932, \u092b\u0938\u0935\u0923\u0941\u0915\u0940 \u0938\u0942\u091a\u0928\u093e\u0902\u092c\u0926\u094d\u0926\u0932, \u0915\u093f\u0902\u0935\u093e \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915 \u0927\u094b\u0930\u0923\u093e\u092c\u0926\u094d\u0926\u0932 \u0935\u093f\u091a\u093e\u0930\u093e.",
         "Based on your current EMI of ₹{amount} and income of ₹{income}, I recommend the following investment strategy:": 
-          "तुमच्या सध्याच्या ₹{amount} ईएमआय आणि ₹{income} उत्पन्नावर आधारित, मी खालील गुंतवणूक धोरणाची शिफारस करतो:",
-        "Emergency Fund": "आपत्कालीन निधी",
-        "SIP Investment": "एसआयपी गुंतवणूक",
-        "Debt Repayment": "कर्ज परतफेड",
-        "Long-term Growth": "दीर्घकालीन वाढ",
-        "I couldn't generate a response yet. Please try once more.": "मी अद्याप प्रतिसाद तयार करू शकलो नाही. कृपया पुन्हा एकदा प्रयत्न करा.",
-        "Scan Passbook": "पासबुक स्कॅन करा",
-        "Camera": "कॅमेरा",
-        "UPI Transfer": "यूपीआय हस्तांतरण",
-        "Salary Credit": "पगार क्रेडिट",
-        "Online Shopping": "ऑनलाइन शॉपिंग",
-        "Electric Bill": "वीज बिल",
-        "Current Balance": "सध्याची शिल्लक",
-        "Last Transaction": "अंतिम व्यवहार",
-        "Recent Transactions": "अलीकडील व्यवहार",
-        "Account Summary": "खाते सारांश",
-        "Send": "पाठवा",
-        "Ask about loans, risk, fraud, investments…": "कर्ज, जोखीम, फसवणूक, गुंतवणुकीबद्दल विचारा…"
+          "\u0924\u0941\u092e\u091a\u094d\u092f\u093e \u0938\u0927\u094d\u092f\u093e\u091a\u094d\u092f\u093e \u20b9{amount} \u0908\u090f\u092e\u0906\u090f \u0906\u0923\u093f \u20b9{income} \u0909\u0924\u094d\u092a\u0928\u094d\u0928\u093e\u0935\u0930 \u0906\u0927\u093e\u0930\u093f\u0924, \u092e\u0940 \u0916\u093e\u0932\u0940\u0932 \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915 \u0927\u094b\u0930\u0923 \u0936\u093f\u092b\u093e\u0930\u0938 \u0915\u0930\u0924\u094b:",
+        "Emergency Fund": "\u0906\u092a\u0924\u094d\u0915\u093e\u0932\u0940\u0928 \u0928\u093f\u0927\u0940",
+        "SIP Investment": "\u090f\u0938\u0906\u090f\u092a\u0940 \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915",
+        "Debt Repayment": "\u0915\u0930\u094d\u091c \u092a\u0930\u0924\u092b\u0947\u0921",
+        "Long-term Growth": "\u0926\u0940\u0930\u094d\u0918\u0915\u093e\u0932\u0940\u0928 \u0935\u093e\u0922",
+        "I couldn't generate a response yet. Please try once more.": "\u092e\u0940 \u0905\u091c\u0942\u0928 \u092a\u094d\u0930\u0924\u093f\u0938\u093e\u0926 \u0924\u092f\u093e\u0930 \u0915\u0930\u0942 \u0936\u0915\u0932\u094b \u0928\u093e\u0939\u0940. \u0915\u0943\u092a\u092f\u093e \u090f\u0915\u0926\u093e \u092a\u0941\u0928\u094d\u0939\u093e \u092a\u094d\u0930\u092f\u0924\u094d\u0928 \u0915\u0930\u093e.",
+        "Scan Passbook": "\u092a\u093e\u0938\u094d\u0916\u092a\u0941\u0938\u094d\u0924\u0915 \u0938\u094d\u0915\u0945\u0928 \u0915\u0930\u093e",
+        "Camera": "\u0915\u0945\u092e\u0930\u093e",
+        "UPI Transfer": "\u092f\u0942\u092a\u0940 \u0939\u0938\u094d\u0924\u093e\u0902\u0924\u0930",
+        "Salary Credit": "\u092a\u0917\u093e\u0930 \u0915\u094d\u0930\u0947\u0921\u093f\u091f",
+        "Online Shopping": "\u0911\u0928\u0932\u093e\u0907\u0928 \u0936\u0949\u092a\u093f\u0902\u0917",
+        "Electric Bill": "\u0935\u0940\u091c\u092a\u093e\u0923\u094d\u092f\u093e\u091a\u093e \u092c\u093f\u0932",
+        "Current Balance": "\u0938\u0926\u094d\u092f \u0936\u093f\u0932\u094d\u0932\u0915",
+        "Last Transaction": "\u0905\u0902\u0924\u093f\u092e \u0935\u094d\u092f\u0935\u0939\u093e\u0930",
+        "Recent Transactions": "\u0905\u0926\u094d\u092f \u0935\u094d\u092f\u0935\u0939\u093e\u0930",
+        "Account Summary": "\u0916\u093e\u0924\u094d\u092f\u0947\u091a\u093e \u0906\u0932\u093e\u0935",
+        "Send": "\u092a\u093e\u0920\u0935\u093e",
+        "Ask about loans, risk, fraud, investments…": "\u0915\u0930\u094d\u091c\u093e\u0902\u092c\u0926\u094d\u0926\u0932, \u091c\u094b\u0916\u092e, \u092b\u0938\u0935\u0923\u0941\u0915\u0940, \u0917\u0941\u0902\u0924\u0935\u0923\u0942\u0915 \u092b\u0926\u094d\u0926\u0932\u0932\u093e \u0935\u093f\u091c\u093e\u0930\u093e…"
       },
       hi: {
-        "Hi {userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.":
-          "नमस्ते {userName}! मैं एस्ट्रो हूं, आपका फिनपायलट एआई सह-पायलट। मुझसे अपने ऋण, जोखिम प्रोफाइल, धोखाधड़ी अलर्ट, या निवेश रणनीति के बारे में पूछें।",
+        "Hi {userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.": 
+          "\u0928\u092e\u0938\u094d\u0924\u0947 {userName}! \u092e\u0948\u0902 \u0906\u0938\u094d\u091f\u094d\u0930\u094b \u0939\u0942\u0902, \u0906\u092a\u0915\u093e \u092b\u093f\u0928\u092a\u093e\u092f\u0932\u091f \u090f\u0906\u0908 \u0938\u0939-\u092a\u093e\u092f\u0932\u091f\u0964 \u092e\u0941\u091d\u0938\u0947 \u0905\u092a\u0928\u0947 \u0923\u0923\u094b\u0902, \u091c\u094b\u0916\u093f\u092e \u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932, \u0927\u094b\u0916\u093e\u0927\u0921\u093c\u0940 \u0905\u0932\u0930\u094d\u091f, \u092f\u093e \u0928\u093f\u0935\u0947\u0936 \u0930\u0923\u0928\u0940\u0924\u093f \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092a\u0942\u091b\u0947\u0902\u0964",
         "Based on your current EMI of ₹{amount} and income of ₹{income}, I recommend the following investment strategy:": 
-          "आपके वर्तमान ₹{amount} ईएमआय और ₹{income} आय के आधार पर, मैं निम्नलिखित निवेश रणनीति की सिफारिश करता हूं:",
-        "Emergency Fund": "आपातकालीन निधि",
-        "SIP Investment": "एसआईपी निवेश",
-        "Debt Repayment": "ऋण चुकौती",
-        "Long-term Growth": "दीर्घकालिक विकास",
-        "I couldn't generate a response yet. Please try once more.": "मैं अभी तक प्रतिक्रिया उत्पन्न नहीं कर सका। कृपया एक बार फिर प्रयास करें।",
-        "Scan Passbook": "पासबुक स्कैन करें",
-        "Camera": "कैमरा",
-        "UPI Transfer": "यूपीआई ट्रांसफर",
-        "Salary Credit": "वेतन क्रेडिट",
-        "Online Shopping": "ऑनलाइन शॉपिंग",
-        "Electric Bill": "बिजली का बिल",
-        "Current Balance": "वर्तमान शेष",
-        "Last Transaction": "अंतिम लेनदेन",
-        "Recent Transactions": "हाल के लेनदेन",
-        "Account Summary": "खाता सारांश",
-        "Send": "भेजें",
-        "Ask about loans, risk, fraud, investments…": "ऋण, जोखिम, धोखाधड़ी, निवेश के बारे में पूछें…"
+          "\u0906\u092a\u0915\u0947 \u0935\u0930\u094d\u0924\u092e\u093e\u0928 \u20b9{amount} \u0908\u090f\u092e\u0906\u0908 \u0914\u0930 \u20b9{income} \u0906\u092f \u0915\u0947 \u0906\u0927\u093e\u0930 \u092a\u0930, \u092e\u0948\u0902 \u0928\u093f\u092e\u094d\u0928\u0932\u093f\u0915\u093f\u0924 \u0928\u093f\u0935\u0947\u0936 \u0930\u0923\u0928\u0940\u0924\u093f \u0915\u0940 \u0905\u0928\u0941\u0936\u0902\u0938\u093e \u0915\u0930\u0924\u093e \u0939\u0942\u0902:",
+        "Emergency Fund": "\u0906\u092a\u093a\u0924\u0915\u093e\u0932\u0940\u0928 \u0915\u094b\u0937",
+        "SIP Investment": "\u090f\u0938\u0906\u0908\u092a\u0940 \u0928\u093f\u0935\u0947\u0936",
+        "Debt Repayment": "\u0915\u0930\u094d\u091c \u091a\u0941\u0915\u094c\u0924\u0940",
+        "Long-term Growth": "\u0926\u0940\u0930\u094d\u0918\u0915\u093e\u0932\u093f\u0915 \u0935\u093f\u0915\u093e\u0938",
+        "I couldn't generate a response yet. Please try once more.": "\u092e\u0948\u0902 \u0905\u092ad\u0940 \u0924\u0915 \u092a\u094d\u0930\u0924\u093f\u0915\u094d\u0930\u093f\u092f\u093e \u0928\u0939\u0940\u0902 \u0926\u0947 \u0938\u0915\u093e\u0964 \u0915\u0943\u092a\u092f\u093e \u090f\u0915 \u092c\u093e\u0930 \u092b\u093f\u0930 \u0938\u0947 \u092a\u094d\u0930\u092f\u093e\u0938 \u0915\u0930\u0947\u0902\u0964",
+        "Scan Passbook": "\u092a\u093e\u0938\u094d\u0916\u092c\u0941\u0915 \u0938\u094d\u0915\u0948\u0928 \u0915\u0930\u0947\u0902",
+        "Camera": "\u0915\u0948\u092e\u0930\u093e",
+        "UPI Transfer": "\u092f\u0942\u092a\u0940 \u091f\u094d\u0930\u093e\u0902\u0938\u092b\u0930",
+        "Salary Credit": "\u0938\u0948\u0932\u0930\u0940 \u0915\u094d\u0930\u0947\u0921\u093f\u091f",
+        "Online Shopping": "\u0911\u0928\u0932\u093e\u0907\u0928 \u0936\u0949\u092a\u093f\u0902\u0917",
+        "Electric Bill": "\u092c\u093f\u091c\u094d\u091c\u0940 \u092c\u093f\u0932",
+        "Current Balance": "\u0935\u0930\u094d\u0924\u092e\u093e\u0928 \u0936\u0947\u0937",
+        "Last Transaction": "\u0905\u0902\u0924\u093f\u092e \u0932\u0947\u0928\u0926\u0947\u0928",
+        "Recent Transactions": "\u0939\u093e\u0932 \u0915\u0940 \u0932\u0947\u0928\u0926\u0947\u0902",
+        "Account Summary": "\u0916\u093e\u0924\u0947 \u0915\u093e \u0938\u093a\u0930\u093e\u0902\u0936",
+        "Send": "\u092d\u0947\u091c\u0947\u0902",
+        "Ask about loans, risk, fraud, investments…": "\u0915\u0930\u094d\u091c\u094b\u0902, \u091c\u094b\u0916\u092e, \u0927\u094b\u0916\u093e\u0927\u0921\u093c\u0940, \u0928\u093f\u0935\u0947\u0936\u094b\u0902 \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092a\u0942\u091b\u0947\u0902…"
       }
     };
     
@@ -1645,13 +1713,12 @@ function AskAstro({ updates, customerProfile }) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [recognition, setRecognition] = useState(null);
-  
-  // Update initial message when language changes or user name changes
-  useEffect(() => {
-    const userName = customerProfile?.name || "there";
-    const welcomeMessage = `Hi ${userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.`;
-    setMsgs([{ role:"ai", text:translateText(welcomeMessage, lang) }]);
-  }, [lang, customerProfile?.name]);
+  const uiCopy = {
+    en: { ask: "Ask Astro", sub: "// conversational AI — powered by your financial twin", language: "Language", startVoice: "Start Voice", stop: "Stop", speak: "Speak Response", speaking: "Speaking...", ready: "Voice Ready", listening: "Listening..." },
+    hi: { ask: "पूछें Astro", sub: "// संवादात्मक AI — आपके वित्तीय ट्विन पर आधारित", language: "भाषा", startVoice: "आवाज़ शुरू", stop: "रोकें", speak: "उत्तर सुनें", speaking: "बोल रहा है...", ready: "आवाज़ तैयार", listening: "सुन रहा है..." },
+    mr: { ask: "विचारा Astro", sub: "// संभाषणात्मक AI — तुमच्या आर्थिक ट्विनवर आधारित", language: "भाषा", startVoice: "आवाज सुरू", stop: "थांबा", speak: "उत्तर ऐका", speaking: "बोलत आहे...", ready: "आवाज तयार", listening: "ऐकत आहे..." },
+  };
+  const u = uiCopy[lang] || uiCopy.en;
   
   // Check browser support for voice features
   useEffect(() => {
@@ -1699,7 +1766,7 @@ function AskAstro({ updates, customerProfile }) {
   }, [lang]);
   
   // Handle voice input sending
-  const handleVoiceSend = (voiceText) => {
+  const handleVoiceSend = async (voiceText) => {
     if (!voiceText.trim() || thinking) return;
     const q = voiceText.trim(); 
     setInput("");
@@ -1708,33 +1775,16 @@ function AskAstro({ updates, customerProfile }) {
     setThinking(true);
     setChatErr("");
     
-    // Simulate AI response for voice input
-    setTimeout(() => {
-      let response;
-      
-      // Check for investment strategy queries
-      if (q.toLowerCase().includes("investment") || q.toLowerCase().includes("strategy") || q.toLowerCase().includes("where to invest")) {
-        const emi = customerProfile?.loans || 24000;
-        const income = customerProfile?.income || 92000;
-        response = { reply: generateInvestmentStrategy(emi, income) };
-      } else if (q.toLowerCase().includes("hello") || q.toLowerCase().includes("hi")) {
-        const userName = customerProfile?.name || "there";
-        response = { reply: `Hello ${userName}! I'm Astro, your FinPilot AI co-pilot. How can I help you today?` };
-      } else if (q.toLowerCase().includes("name")) {
-        const userName = customerProfile?.name || "User";
-        response = { reply: `Your name is ${userName}. I'm here to help with your financial questions!` };
-      } else {
-        response = { reply: `I understand you're asking about: "${q}". Let me help you with that. This is a simulated response for voice input.` };
-      }
-      
-      setMsgs(m => [...m, { role:"ai", text: response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang) }]);
+    try {
+      const response = await api.voiceReply({ transcript: q, language: lang, profile: customerProfile });
+      const text = response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang);
+      setMsgs(m => [...m, { role:"ai", text }]);
+      speakText(text);
+    } catch {
+      setMsgs(m => [...m, { role:"ai", text: translateText("I couldn't generate a response yet. Please try once more.", lang) }]);
+    } finally {
       setThinking(false);
-      
-      // Auto-speak the response for voice interaction
-      setTimeout(() => {
-        speakText(response.reply);
-      }, 1000);
-    }, 1500);
+    }
   };
   
   // Voice synthesis function
@@ -1776,11 +1826,15 @@ function AskAstro({ updates, customerProfile }) {
   const ref = useRef(null);
   const knowledge = updates?.knowledge || [];
   
-  // Update initial message when language changes or user name changes
+  // Update initial message when language or user name changes
   useEffect(() => {
     const userName = customerProfile?.name || "there";
-    const welcomeMessage = `Hi ${userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.`;
-    setMsgs([{ role:"ai", text:translateText(welcomeMessage, lang) }]);
+    const greetings = {
+      en: `Hi ${userName}! I'm Astro, your FinPilot AI co-pilot. Ask me about your loans, risk profile, fraud alerts, or investment strategy.`,
+      hi: `नमस्ते ${userName}! मैं Astro हूँ। अपने loans, risk profile, fraud alerts और investment strategy के बारे में पूछिए।`,
+      mr: `नमस्कार ${userName}! मी Astro आहे. तुमच्या कर्ज, जोखीम प्रोफाइल, फसवणूक सूचना आणि गुंतवणूक धोरणाबद्दल विचारा.`,
+    };
+    setMsgs([{ role:"ai", text:greetings[lang] || greetings.en }]);
   }, [lang, customerProfile?.name]);
   
   useEffect(() => { ref.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
@@ -1822,16 +1876,7 @@ function AskAstro({ updates, customerProfile }) {
     try {
       let response;
       
-      // Check for investment strategy queries
-      if (q.toLowerCase().includes("investment") || q.toLowerCase().includes("strategy") || q.toLowerCase().includes("where to invest")) {
-        // Extract EMI and income from context or use defaults
-        const emi = customerProfile?.loans || 24000;
-        const income = customerProfile?.income || 92000;
-        response = { reply: generateInvestmentStrategy(emi, income) };
-      } else {
-        // Use existing API for other queries
-        response = await api.askAstro({ message: q, language: lang });
-      }
+      response = await api.askAstro({ message: q, language: lang, profile: customerProfile });
       
       setMsgs(m => [...m, { role:"ai", text: response.reply || translateText("I couldn't generate a response yet. Please try once more.", lang) }]);
     } catch {
@@ -1847,11 +1892,11 @@ function AskAstro({ updates, customerProfile }) {
       <div style={{ display:"flex", alignItems:"center", gap:mobile ? 12 : 16, marginBottom:mobile ? 12 : 16, flexWrap:"wrap" }}>
         <AstroSphere size={mobile ? 60 : 100} color1="#0a2a5e" color2="#051530" glowColor="#63b3ff" variant="default" animate />
         <div style={{ flex:1, minWidth:mobile ? 140 : 180 }}>
-          <div style={{ fontSize:mobile ? 20 : 26, fontWeight:800 }}>✦ Ask <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Astro</span></div>
-          <div style={{ color:"rgba(226,234,255,0.35)", fontFamily:"'JetBrains Mono', monospace", fontSize:mobile ? 9 : 11, marginTop:mobile ? 2 : 4 }}>// conversational AI — powered by your financial twin</div>
+          <div style={{ fontSize:mobile ? 20 : 26, fontWeight:800 }}>✦ <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{u.ask}</span></div>
+          <div style={{ color:"rgba(226,234,255,0.35)", fontFamily:"'JetBrains Mono', monospace", fontSize:mobile ? 9 : 11, marginTop:mobile ? 2 : 4 }}>{u.sub}</div>
         </div>
         <div style={{ display:"flex", gap:mobile ? 4 : 6, alignItems:"center", flexWrap:"wrap" }}>
-          <div style={{ fontSize:mobile ? 9 : 10, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(148,163,184,0.9)" }}>Language</div>
+          <div style={{ fontSize:mobile ? 9 : 10, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(148,163,184,0.9)" }}>{u.language}</div>
           {[
             { id:"en", label:"English" },
             { id:"mr", label:"Marathi" },
@@ -1929,14 +1974,14 @@ function AskAstro({ updates, customerProfile }) {
                   <div style={{ width:mobile ? 12 : 16, height:mobile ? 12 : 16, borderRadius:"50%", background:"#f87171", display:"flex", alignItems:"center", justifyContent:"center" }}>
                     <div style={{ width:mobile ? 6 : 8, height:mobile ? 6 : 8, borderRadius:"50%", background:"rgba(255,255,255,0.3)", margin:"0 auto" }}></div>
                   </div>
-                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🔴 Stop</span>
+                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🔴 {u.stop}</span>
                 </>
               ) : (
                 <>
                   <div style={{ width:mobile ? 12 : 16, height:mobile ? 12 : 16, borderRadius:"50%", background:"#63b3ff", display:"flex", alignItems:"center", justifyContent:"center" }}>
                     <div style={{ width:mobile ? 6 : 8, height:mobile ? 6 : 8, borderRadius:"50%", background:"rgba(255,255,255,0.3)", margin:"0 auto" }}></div>
                   </div>
-                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🎤 Start Voice</span>
+                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🎤 {u.startVoice}</span>
                 </>
               )}
             </button>
@@ -1965,14 +2010,14 @@ function AskAstro({ updates, customerProfile }) {
                   <div style={{ width:mobile ? 12 : 16, height:mobile ? 12 : 16, borderRadius:"50%", background:"#94a3b8", display:"flex", alignItems:"center", justifyContent:"center" }}>
                     <div style={{ width:mobile ? 6 : 8, height:mobile ? 6 : 8, borderRadius:"50%", background:"rgba(255,255,255,0.3)", margin:"0 auto" }}></div>
                   </div>
-                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🔊 Speaking...</span>
+                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🔊 {u.speaking}</span>
                 </>
               ) : (
                 <>
                   <div style={{ width:mobile ? 12 : 16, height:mobile ? 12 : 16, borderRadius:"50%", background:"#34d399", display:"flex", alignItems:"center", justifyContent:"center" }}>
                     <div style={{ width:mobile ? 6 : 8, height:mobile ? 6 : 8, borderRadius:"50%", background:"rgba(255,255,255,0.3)", margin:"0 auto" }}></div>
                   </div>
-                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🔊 Speak Response</span>
+                  <span style={{ marginLeft:mobile ? 6 : 8 }}>🔊 {u.speak}</span>
                 </>
               )}
             </button>
@@ -1989,7 +2034,7 @@ function AskAstro({ updates, customerProfile }) {
               borderRadius:mobile ? 4 : 6,
               minWidth:mobile ? 80 : 120
             }}>
-              {isListening ? "🎤 Listening..." : isSpeaking ? "🔊 Speaking..." : "🎤 Voice Ready"}
+              {isListening ? `🎤 ${u.listening}` : isSpeaking ? `🔊 ${u.speaking}` : `🎤 ${u.ready}`}
             </div>
           </div>
         )}
@@ -1998,86 +2043,1434 @@ function AskAstro({ updates, customerProfile }) {
           <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
             placeholder={translateText("Ask about loans, risk, fraud, investments…", lang)}
             className="glass-input"
-            style={{ 
-              flex:1, 
-              minWidth:200,
-              padding:"12px 16px", 
-              background:"rgba(15,23,42,0.9)", 
-              color:"#e2eaff", 
-              border:"1px solid rgba(148,163,184,0.5)", 
-              borderRadius:12, 
-              fontSize:14,
-              outline:"none"
+            style={{ flex:1, minWidth:0, padding:mobile ? "10px 14px" : "13px 18px", background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:mobile ? 10 : 12, color:"#e2eaff", fontSize:mobile ? 13 : 14 }} />
+          <button onClick={send} style={{
+            padding:mobile ? "10px 14px" : "13px 18px",
+            background:"linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))",
+            border:"1px solid rgba(99,179,255,0.3)",
+            borderRadius:mobile ? 10 : 12,
+            color:"#e2eaff",
+            fontSize:mobile ? 13 : 14,
+            fontWeight:700,
+            cursor:"pointer",
+            transition:"all 0.2s"
+          }}>
+            {translateText("Send", lang)}
+          </button>
+          
+          {/* Bank Selection & Scan Passbook */}
+          <select value={bank} onChange={e=>setBank(e.target.value)} style={{
+            padding:mobile ? "8px 12px" : "10px 14px",
+            background:"rgba(255,255,255,0.04)",
+            border:"1px solid rgba(255,255,255,0.08)",
+            borderRadius:mobile ? 8 : 10,
+            color:"#e2eaff",
+            fontSize:mobile ? 11 : 12,
+            cursor:"pointer"
+          }}>
+            <option value="HDFC">HDFC Bank</option>
+            <option value="ICICI">ICICI Bank</option>
+            <option value="SBI">State Bank of India</option>
+            <option value="Axis">Axis Bank</option>
+            <option value="Kotak">Kotak Bank</option>
+          </select>
+          
+          <button onClick={() => {
+            setScanMsg(`🔍 Scanning ${bank} passbook...`);
+            setTimeout(() => {
+              const transactions = [
+                { date: "2026-02-20", desc: "UPI Transfer to John", amount: -2500, balance: 45600 },
+                { date: "2026-02-19", desc: "Salary Credit", amount: 52000, balance: 48100 },
+                { date: "2026-02-18", desc: "Amazon Purchase", amount: -1299, balance: 4100 },
+                { date: "2026-02-17", desc: "Electric Bill", amount: -850, balance: 5399 }
+              ];
+              setBankSnap({ bank, balance: 45600, lastTransaction: "UPI Transfer to John", transactions });
+              setScanMsg(translateText(`✅ ${bank} passbook scanned successfully! Latest balance: ₹45,600`, lang));
+            }, 2000);
+          }} style={{
+            padding:mobile ? "8px 12px" : "10px 14px",
+            background:"linear-gradient(135deg,rgba(52,211,153,0.2),rgba(34,211,238,0.2))",
+            border:"1px solid rgba(52,211,153,0.3)",
+            borderRadius:mobile ? 8 : 10,
+            color:"#e2eaff",
+            fontSize:mobile ? 11 : 12,
+            fontWeight:600,
+            cursor:"pointer",
+            transition:"all 0.2s"
+          }}>
+            📷 {translateText("Scan Passbook", lang)}
+          </button>
+          
+          <button onClick={() => {
+            document.getElementById('passbook-camera-input').click();
+          }} style={{
+            padding:mobile ? "8px 12px" : "10px 14px",
+            background:"linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))",
+            border:"1px solid rgba(99,179,255,0.3)",
+            borderRadius:mobile ? 8 : 10,
+            color:"#e2eaff",
+            fontSize:mobile ? 11 : 12,
+            fontWeight:600,
+            cursor:"pointer",
+            transition:"all 0.2s"
+          }}>
+            📸 {translateText("Camera", lang)}
+          </button>
+          
+          <input
+            id="passbook-camera-input"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display:"none" }}
+            onChange={e=>{
+              if (!e.target.files?.length) return;
+              setScanMsg(translateText("🔍 Processing passbook image...", lang));
+              setTimeout(() => {
+                const transactions = [
+                  { date: "2026-02-20", desc: translateText("UPI Transfer", lang), amount: -2500, balance: 45600 },
+                  { date: "2026-02-19", desc: translateText("Salary Credit", lang), amount: 52000, balance: 48100 },
+                  { date: "2026-02-18", desc: translateText("Online Shopping", lang), amount: -1299, balance: 4100 },
+                  { date: "2026-02-17", desc: translateText("Electric Bill", lang), amount: -850, balance: 5399 }
+                ];
+                setBankSnap({ bank, balance: 45600, lastTransaction: translateText("UPI Transfer", lang), transactions });
+                setScanMsg(translateText(`✅ Passbook processed! Account: ${bank} | Balance: ₹45,600 | Last: UPI Transfer`, lang));
+              }, 1500);
             }}
           />
-          <button onClick={send} disabled={thinking || !input.trim()}
-            style={{
-              padding:"12px 20px",
-              background: thinking || !input.trim() ? "rgba(148,163,184,0.2)" : "rgba(99,179,255,0.15)",
-              border: thinking || !input.trim() ? "1px solid rgba(148,163,184,0.4)" : "1px solid rgba(99,179,255,0.3)",
-              borderRadius:12,
-              color: thinking || !input.trim() ? "#94a3b8" : "#e2eaff",
-              fontSize:12,
-              fontWeight:600,
-              cursor: thinking || !input.trim() ? "not-allowed" : "pointer",
-              transition:"all 0.2s"
-            }}
-          >
-            {thinking ? "..." : "Send"}
-          </button>
         </div>
-        {chatErr && <div style={{ color:"#f87171", fontSize:12, marginTop:4 }}>{chatErr}</div>}
+        {!!chatErr && <div style={{ marginTop:8, color:"#f87171", fontSize:12 }}>{chatErr}</div>}
+        {!!scanMsg && <div style={{ marginTop:4, color:"rgba(226,234,255,0.7)", fontSize:11 }}>{scanMsg}</div>}
+        
+        {/* Bank Transaction Display */}
+        {bankSnap && (
+          <div style={{
+            marginTop:16,
+            padding:16,
+            background:"rgba(15,23,42,0.1)",
+            border:"1px solid rgba(52,211,153,0.2)",
+            borderRadius:12,
+            animation:"fadeIn 0.3s ease"
+          }}>
+            <div style={{ fontSize:14, fontWeight:700, color:"#63b3ff", marginBottom:12 }}>
+              📊 {translateText("Account Summary", lang)} - {bankSnap.bank}
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12, marginBottom:16 }}>
+              <div style={{ padding:12, background:"rgba(99,179,255,0.1)", borderRadius:8, border:"1px solid rgba(99,179,255,0.2)" }}>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.6)", marginBottom:4 }}>{translateText("Current Balance", lang)}</div>
+                <div style={{ fontSize:20, fontWeight:700, color:"#63b3ff" }}>₹{bankSnap.balance.toLocaleString("en-IN")}</div>
+              </div>
+              <div style={{ padding:12, background:"rgba(52,211,153,0.1)", borderRadius:8, border:"1px solid rgba(52,211,153,0.2)" }}>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.6)", marginBottom:4 }}>{translateText("Last Transaction", lang)}</div>
+                <div style={{ fontSize:13, fontWeight:600, color:"#34d399" }}>{bankSnap.lastTransaction}</div>
+              </div>
+            </div>
+            
+            <div style={{ fontSize:12, fontWeight:600, color:"rgba(226,234,255,0.7)", marginBottom:8 }}>
+              📈 {translateText("Recent Transactions", lang)}
+            </div>
+            <div style={{ maxHeight:200, overflowY:"auto", paddingRight:4 }}>
+              {bankSnap.transactions.map((tx, idx) => (
+                <div key={idx} style={{
+                  display:"flex", 
+                  justifyContent:"space-between", 
+                  alignItems:"center",
+                  padding:"8px 12px",
+                  background: idx % 2 === 0 ? "rgba(255,255,255,0.02)" : "rgba(15,23,42,0.05)",
+                  borderBottom:"1px solid rgba(255,255,255,0.04)",
+                  fontSize:11
+                }}>
+                  <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                    <div style={{ color:"rgba(226,234,255,0.6)", fontSize:10 }}>{tx.date}</div>
+                    <div style={{ color:"#e2eaff" }}>{tx.desc}</div>
+                  </div>
+                  <div style={{ 
+                    fontWeight:600, 
+                    color: tx.amount < 0 ? "#f87171" : "#34d399" 
+                  }}>
+                    {tx.amount < 0 ? "-" : "+"}₹{Math.abs(tx.amount).toLocaleString("en-IN")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// ── HELPER COMPONENTS ───────────────────────────────────────────
-function HexNews({ title, cat, time, sentiment, delay = 0 }) {
-  const colors = { neutral: "#fbbf24", bullish: "#34d399", bearish: "#f87171" };
+// ── ANALYTICS ─────────────────────────────────────────────────
+function Analytics({ updates }) {
+  const months = ["Aug","Sep","Oct","Nov","Dec","Jan","Feb"];
+  const income  = [72,78,75,82,85,80,85];
+  const spend   = [38,42,39,44,48,41,42];
+  const stockAlerts = updates?.stockAlerts || [];
+  const knowledge = updates?.knowledge || [];
+  return (
+    <div style={{ animation:"fadeIn 0.4s ease" }}>
+      <div style={{ fontSize:28, fontWeight:800, marginBottom:8 }}>▲ <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Analytics</span></div>
+      <div className="sphere-row" style={{ display:"flex", gap:40, alignItems:"center", flexWrap:"wrap", marginTop:24 }}>
+        <AstroSphere size={200} color1="#1a1a6e" color2="#0d0d4e" glowColor="#a78bfa" label="DATA" sublabel="STREAM" variant="default" animate />
+        <div style={{ flex:1, minWidth:220 }}>
+          <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(226,234,255,0.35)", marginBottom:20 }}>7-Month Income vs Spending (₹000s)</div>
+          <div style={{ display:"flex", alignItems:"flex-end", gap:12, height:160 }}>
+            {months.map((m,i) => (
+              <div key={m} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:0, height:"100%", justifyContent:"flex-end" }}>
+                <div style={{ width:"100%", display:"flex", gap:2, alignItems:"flex-end", justifyContent:"center" }}>
+                  <div style={{ width:"45%", height:Math.round(income[i]/85*130)+"px", background:"linear-gradient(to top,#63b3ff,#63b3ff50)", borderRadius:"3px 3px 0 0", filter:"drop-shadow(0 0 4px #63b3ff40)" }} />
+                  <div style={{ width:"45%", height:Math.round(spend[i]/85*130)+"px",  background:"linear-gradient(to top,#fbbf24,#fbbf2450)", borderRadius:"3px 3px 0 0", filter:"drop-shadow(0 0 4px #fbbf2440)" }} />
+                </div>
+                <div style={{ fontSize:9, color:"rgba(226,234,255,0.3)", marginTop:8, letterSpacing:"0.04em" }}>{m}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:20, marginTop:16, paddingTop:16, borderTop:"1px solid rgba(255,255,255,0.05)" }}>
+            {[["#63b3ff","Income"],["#fbbf24","Spending"]].map(([c,l]) => (
+              <div key={l} style={{ display:"flex", alignItems:"center", gap:7, fontSize:11, color:"rgba(226,234,255,0.4)" }}>
+                <div style={{ width:10, height:3, background:c, borderRadius:2, filter:`drop-shadow(0 0 3px ${c})` }} />{l}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{ marginTop:24, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))", gap:14 }}>
+        {stockAlerts.map((s, i) => (
+          <StockTicker key={`analytics-${s.ticker}-${i}`} ticker={s.ticker} price={s.price} change={s.change} color={s.color} />
+        ))}
+      </div>
+      <div style={{ marginTop:18, display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(167,139,250,0.75)" }}>Fintech Knowledge Pulse</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))", gap:10 }}>
+          {knowledge.slice(0, 2).map((k, i) => (
+            <DoYouKnowButton key={`analytics-btn-${i}`} question={k.question} answer={k.answer} />
+          ))}
+        </div>
+        {knowledge.slice(1, 3).map((k, i) => (
+          <KnowledgePill key={`analytics-know-${i}`} question={k.question} answer={k.answer} delay={i * 0.1} />
+        ))}
+      </div>
+      <div style={{ marginTop:18, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))", gap:12 }}>
+        <InvestorProfile
+          name="Radhika Menon"
+          title="Fintech Portfolio Strategist"
+          quote="In uncertain markets, cash flow quality beats short-term momentum."
+          achievement="Backtested 14% drawdown reduction with staggered allocation rules."
+          delay={0}
+        />
+        <InvestorProfile
+          name="Kabir Shah"
+          title="Risk & Fraud Research Lead"
+          quote="Device intelligence combined with behavioral velocity catches fraud earlier."
+          achievement="Reduced false positives by 22% using dynamic threshold scoring."
+          delay={0.12}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FeatureShard({ title, items, color, delay = 0 }) {
+  return (
+    <div style={{ position:"relative", animation:`fadeUp 0.35s ease ${delay}s both` }}>
+      <div aria-hidden style={{
+        position:"absolute", inset:0,
+        clipPath:"polygon(4% 0, 96% 0, 100% 12%, 100% 88%, 96% 100%, 4% 100%, 0 88%, 0 12%)",
+        background:`linear-gradient(135deg, ${color}12, rgba(255,255,255,0.02))`,
+        border:`1px solid ${color}45`,
+        boxShadow:`0 0 18px ${color}15`,
+        pointerEvents:"none",
+      }} />
+      <div style={{
+        position:"relative",
+        padding:"20px 26px",
+        paddingLeft:30,
+        overflow:"visible",
+      }}>
+        <div style={{ fontSize:12, fontWeight:800, letterSpacing:"0.12em", textTransform:"uppercase", color, marginBottom:12, lineHeight:1.2 }}>
+          {title}
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:9 }}>
+          {items.map((it, idx) => (
+            <div key={idx} style={{ display:"flex", alignItems:"flex-start", gap:10, color:"rgba(226,234,255,0.82)", lineHeight:1.6, fontSize:13 }}>
+              <span style={{ marginTop:6, width:6, height:6, borderRadius:"50%", background:color, boxShadow:`0 0 7px ${color}`, flexShrink:0 }} />
+              <span style={{ paddingRight:6 }}>{it}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SmartCrossSell({ token, customerProfile, setCustomerProfile }) {
+  const [result, setResult] = useState(fallbackCrossSell);
+  const [loading, setLoading] = useState(false);
+  const profile = customerProfile;
+  const update = (k, v) => setCustomerProfile((p) => ({ ...p, [k]: v }));
+  
+  // Dynamic reasoning logic based on profile data
+  const generateDynamicRecommendations = (profileData) => {
+    const { income, spending, loans, creditScore, riskLevel } = profileData;
+    const savingsRatio = (income - spending) / income;
+    const debtToIncome = loans / income;
+    const creditUtilization = spending / income;
+    
+    const recommendations = [];
+    let reasoningOutput = "";
+    let topConfidence = 0;
+    
+    // Wealth Plus SIP logic
+    if (savingsRatio > 0.3 && creditScore > 700) {
+      recommendations.push({
+        productName: "Wealth Plus SIP",
+        reason: `High savings ratio (${Math.round(savingsRatio * 100)}%) and excellent credit score (${creditScore}) indicate strong investment capacity.`,
+        confidence: 0.92,
+        riskTag: "Low",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.92);
+    } else if (savingsRatio > 0.2) {
+      recommendations.push({
+        productName: "Wealth Plus SIP",
+        reason: `Moderate savings ratio (${Math.round(savingsRatio * 100)}%) suggests potential for systematic investment planning.`,
+        confidence: 0.75,
+        riskTag: "Low",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.75);
+    }
+    
+    // Secured Credit Card logic
+    if (creditScore > 750 && debtToIncome < 0.3) {
+      recommendations.push({
+        productName: "Secured Credit Card",
+        reason: `Excellent credit score (${creditScore}) and low debt-to-income ratio (${Math.round(debtToIncome * 100)}%) qualify for premium secured card.`,
+        confidence: 0.88,
+        riskTag: "Low",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.88);
+    } else if (creditScore > 650 && debtToIncome < 0.5) {
+      recommendations.push({
+        productName: "Secured Credit Card",
+        reason: `Good credit score (${creditScore}) and manageable debt levels (${Math.round(debtToIncome * 100)}% DTI) support secured card eligibility.`,
+        confidence: 0.72,
+        riskTag: "Medium",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.72);
+    }
+    
+    // Instant Personal Loan logic
+    if (spending > income * 0.8 && creditScore > 600) {
+      recommendations.push({
+        productName: "Instant Personal Loan",
+        reason: `High spending ratio (${Math.round(creditUtilization * 100)}%) with decent credit score (${creditScore}) suggests need for liquidity management.`,
+        confidence: 0.68,
+        riskTag: "Medium",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.68);
+    } else if (loans > 50000 && creditScore > 700) {
+      recommendations.push({
+        productName: "Instant Personal Loan",
+        reason: `Existing loan portfolio (₹${loans.toLocaleString("en-IN")}) with strong credit score (${creditScore}) indicates loan consolidation opportunity.`,
+        confidence: 0.74,
+        riskTag: "Low",
+        ctaPrimary: "Apply",
+        ctaSecondary: "Save"
+      });
+      topConfidence = Math.max(topConfidence, 0.74);
+    }
+    
+    // Generate reasoning output
+    if (recommendations.length > 0) {
+      const topRec = recommendations.reduce((prev, curr) => prev.confidence > curr.confidence ? prev : curr);
+      reasoningOutput = `Primary recommendation: ${topRec.productName}. Based on income ₹${income.toLocaleString("en-IN")}, spending ratio ${Math.round(creditUtilization * 100)}%, and credit score ${creditScore}.`;
+    } else {
+      reasoningOutput = `Profile analysis complete. Income: ₹${income.toLocaleString("en-IN")}, Credit Score: ${creditScore}. Current financial profile is stable - consider savings products.`;
+    }
+    
+    return {
+      recommendations,
+      reasoningOutput,
+      confidenceTop: topConfidence,
+      profile: { riskScore: Math.round((1 - savingsRatio) * 100) },
+      filteredUnsafe: riskLevel === "high" ? 2 : riskLevel === "medium" ? 1 : 0
+    };
+  };
+  
+  const run = async () => {
+    setLoading(true);
+    // Simulate API call with dynamic logic
+    setTimeout(() => {
+      const dynamicResult = generateDynamicRecommendations(profile);
+      setResult(dynamicResult);
+      setLoading(false);
+    }, 1000);
+  };
+
+  return (
+    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:20 }}>
+      <div style={{ fontSize:30, fontWeight:800 }}>⟠ <span style={{ background:"linear-gradient(135deg,#34d399,#63b3ff)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Smart Cross-Sell</span></div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:14 }}>
+        <FeatureShard title="Profile Inputs" color="#63b3ff" items={[`Income ₹${profile.income.toLocaleString("en-IN")}`, `Spending ₹${profile.spending.toLocaleString("en-IN")}`, `Loans ₹${profile.loans.toLocaleString("en-IN")}`, `Credit ${profile.creditScore}`, `Risk ${profile.riskLevel}`]} />
+        <div style={{ position:"relative" }}>
+          <div aria-hidden style={{
+            position:"absolute",
+            inset:0,
+            clipPath:"polygon(6% 0, 94% 0, 100% 16%, 100% 84%, 94% 100%, 6% 100%, 0 84%, 0 16%)",
+            border:"1px solid rgba(99,179,255,0.4)",
+            background:"rgba(99,179,255,0.08)",
+            boxShadow:"0 0 16px rgba(99,179,255,0.2)",
+            pointerEvents:"none",
+          }} />
+          <div style={{ position:"relative", padding:"18px 22px", paddingLeft:26, display:"flex", flexDirection:"column", gap:10 }}>
+            <label style={{ fontSize:12, display:"block" }}>Income
+              <input type="range" min={25000} max={220000} step={1000} value={profile.income} onChange={e=>update("income", Number(e.target.value))} style={{ width:"100%", marginTop:4 }} />
+            </label>
+            <label style={{ fontSize:12, display:"block" }}>Spending
+              <input type="range" min={8000} max={160000} step={1000} value={profile.spending} onChange={e=>update("spending", Number(e.target.value))} style={{ width:"100%", marginTop:4 }} />
+            </label>
+            <label style={{ fontSize:12, display:"block" }}>Loans
+              <input type="range" min={0} max={120000} step={1000} value={profile.loans} onChange={e=>update("loans", Number(e.target.value))} style={{ width:"100%", marginTop:4 }} />
+            </label>
+            <label style={{ fontSize:12, display:"block" }}>Credit Score
+              <input type="range" min={500} max={900} step={1} value={profile.creditScore} onChange={e=>update("creditScore", Number(e.target.value))} style={{ width:"100%", marginTop:4 }} />
+            </label>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:4 }}>
+              {["low","medium","high"].map((r)=>(
+                <button key={r} onClick={()=>update("riskLevel", r)} style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:`1px solid ${profile.riskLevel===r?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.2)"}`, color:profile.riskLevel===r?"#34d399":"rgba(226,234,255,0.7)", padding:"7px 10px", fontSize:11 }}>
+                  {r}
+                </button>
+              ))}
+            </div>
+            <div style={{ marginTop:4 }}>
+              <Btn onClick={run} loading={loading}>POST /cross-sell/recommend</Btn>
+            </div>
+          </div>
+        </div>
+        <FeatureShard title="Reasoning Output" color="#34d399" items={[result.reasoningOutput || "No recommendation yet", `Top confidence ${Math.round((result.confidenceTop || 0) * 100)}%`, `Unsafe filtered ${result.filteredUnsafe || 0}`]} />
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))", gap:14 }}>
+        {(result.recommendations || []).map((rec, i) => (
+          <div key={i} style={{ position:"relative" }}>
+            <div aria-hidden style={{
+              position:"absolute", inset:0,
+              clipPath:"polygon(8% 0, 92% 0, 100% 18%, 100% 82%, 92% 100%, 8% 100%, 0 82%, 0 18%)",
+              border:"1px solid rgba(52,211,153,0.4)",
+              background:"linear-gradient(145deg, rgba(52,211,153,0.16), rgba(99,179,255,0.06))",
+              boxShadow:"0 0 18px rgba(52,211,153,0.28)",
+              pointerEvents:"none",
+            }} />
+            <div style={{ position:"relative", padding:"16px 22px", paddingLeft:26, display:"flex", flexDirection:"column", gap:10 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
+                <div style={{ fontSize:18, fontWeight:800 }}>{rec.productName}</div>
+                <div style={{ clipPath:"polygon(15% 0,100% 0,85% 100%,0 100%)", border:"1px solid rgba(255,255,255,0.25)", padding:"4px 9px", fontSize:10, color:rec.riskTag==="Low"?"#34d399":"#fbbf24" }}>{rec.riskTag}</div>
+              </div>
+              <div style={{ fontSize:13, color:"rgba(226,234,255,0.82)", lineHeight:1.6 }}>{rec.reason}</div>
+              <div style={{ fontSize:12, color:"#63b3ff" }}>Confidence {Math.round((rec.confidence || 0) * 100)}%</div>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                <button style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"8px 12px", fontSize:12 }}>{rec.ctaPrimary || "Apply"}</button>
+                <button style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:"1px solid rgba(255,255,255,0.28)", background:"rgba(255,255,255,0.06)", color:"#e2eaff", padding:"8px 12px", fontSize:12 }}>{rec.ctaSecondary || "Save"}</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BankerRMCopilot({ token, bankerToken, setBankerToken, customerProfile, setCustomerProfile }) {
+  const [summary, setSummary] = useState(null);
+  const [decision, setDecision] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState("Secured Credit Card");
+  const [err, setErr] = useState("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [sessionSecure, setSessionSecure] = useState(false);
+  const activeToken = bankerToken || token;
+
+  // Security & Authentication Layer
+  const authenticateBanker = () => {
+    if (!activeToken) {
+      setErr("🔒 Banker authentication required. Please provide valid credentials.");
+      return false;
+    }
+    
+    // Simulate secure authentication
+    setIsAuthenticated(true);
+    setSessionSecure(true);
+    setErr("");
+    return true;
+  };
+
+  const enableBanker = () => {
+    if (authenticateBanker()) {
+      setBankerToken("banker_" + Date.now());
+      setErr("✅ Banker mode enabled - Secure session active");
+    }
+  };
+
+  // Generate product-specific reasonings
+  const getProductReasoning = (product, profile) => {
+    const { income, spending, loans, creditScore, riskLevel } = profile;
+    const savingsRatio = (income - spending) / income;
+    const debtToIncome = loans / income;
+    const creditUtilization = spending / income;
+
+    switch (product) {
+      case "Secured Credit Card":
+        if (creditScore > 750 && debtToIncome < 0.3) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Premium Secured Card",
+            reason: "Excellent credit score (>750) and low debt-to-income ratio (<30%) qualify for premium secured credit card with ₹2,00,000 limit and cashback benefits."
+          };
+        } else if (creditScore > 650 && debtToIncome < 0.5) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Standard Secured Card",
+            reason: "Good credit score (>650) and manageable debt levels (<50% DTI) support secured credit card eligibility with ₹1,00,000 limit."
+          };
+        } else {
+          return {
+            allowed: false,
+            recommend: "BLOCKED - Improve Credit Profile",
+            reason: `Credit score ${creditScore} and DTI ${Math.round(debtToIncome * 100)}% below threshold. Focus on reducing existing debt and improving payment history.`
+          };
+        }
+
+      case "Wealth Plus SIP":
+        if (savingsRatio > 0.3 && creditScore > 700) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Wealth Plus SIP",
+            reason: `High savings ratio (${Math.round(savingsRatio * 100)}%) and excellent credit score (${creditScore}) indicate strong investment capacity. Recommended SIP: ₹15,000/month for diversified portfolio.`
+          };
+        } else if (savingsRatio > 0.2) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Starter SIP",
+            reason: `Moderate savings ratio (${Math.round(savingsRatio * 100)}%) suggests potential for systematic investment. Recommended SIP: ₹8,000/month to begin wealth building.`
+          };
+        } else {
+          return {
+            allowed: false,
+            recommend: "BLOCKED - Increase Savings",
+            reason: `Current savings ratio (${Math.round(savingsRatio * 100)}%) below minimum 20%. Focus on increasing savings before starting SIP investments.`
+          };
+        }
+
+      case "Instant Personal Loan":
+        if (creditScore > 750 && debtToIncome < 0.4) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Premium Personal Loan",
+            reason: `Excellent credit score (${creditScore}) and low debt burden qualify for premium personal loan up to ₹5,00,000 at 10.5% APR.`
+          };
+        } else if (creditScore > 650 && debtToIncome < 0.6) {
+          return {
+            allowed: true,
+            recommend: "APPROVED - Standard Personal Loan",
+            reason: `Good credit profile supports personal loan up to ₹3,00,000 at 12.5% APR. Recommended for debt consolidation.`
+          };
+        } else {
+          return {
+            allowed: false,
+            recommend: "BLOCKED - High Risk Profile",
+            reason: `High debt-to-income ratio (${Math.round(debtToIncome * 100)}%) and credit score ${creditScore} indicate elevated risk. Reduce existing obligations first.`
+          };
+        }
+
+      default:
+        return {
+          allowed: false,
+          recommend: "UNKNOWN PRODUCT",
+          reason: "Product not recognized in risk assessment system."
+        };
+    }
+  };
+
+  const getDecision = async () => {
+    if (!summary?.customer) return;
+    // Use local reasoning logic instead of API call
+    const reasoning = getProductReasoning(selectedProduct, customerProfile);
+    setDecision(reasoning);
+  };
+
+  const loadSummary = async () => {
+    if (!isAuthenticated) {
+      setErr("🔒 Authentication required to access customer data");
+      return;
+    }
+
+    try {
+      const x = await api.getBankerToken();
+      setBankerToken(x.bankerToken || "");
+      setSummary({
+        customerName: customerProfile?.name || "Customer",
+        customerId: customerProfile?.customerId || "CUST-7721",
+        riskProfile: customerProfile?.riskLevel || "medium",
+        lastLogin: new Date().toLocaleDateString("en-IN"),
+        sessionSecure: true,
+        dataEncrypted: true
+      });
+      setErr("✅ Secure customer data loaded");
+    } catch (error) {
+      setErr("🔐 Failed to load customer summary - Please check permissions");
+    }
+  };
+
+  useEffect(() => {
+    if (bankerToken) loadSummary();
+  }, [bankerToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!bankerToken) return;
+    const t = setTimeout(() => loadSummary(), 180);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    bankerToken,
+    customerProfile?.name,
+    customerProfile?.income,
+    customerProfile?.spending,
+    customerProfile?.loans,
+    customerProfile?.creditScore,
+    customerProfile?.riskLevel,
+  ]);
+
+  return (
+    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:18 }}>
+      <div style={{ fontSize:30, fontWeight:800 }}>⌁ <span style={{ background:"linear-gradient(135deg,#63b3ff,#34d399)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Banker / RM Co-Pilot</span></div>
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+        <button onClick={enableBanker} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#63b3ff", padding:"10px 14px", fontSize:12 }}>Enable Banker Role</button>
+        <button onClick={loadSummary} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.4)", background:"rgba(52,211,153,0.12)", color:"#34d399", padding:"10px 14px", fontSize:12 }}>GET /rm/customer-summary</button>
+      </div>
+      {!bankerToken && <div style={{ color:"rgba(226,234,255,0.7)", fontSize:12 }}>Enable banker role to access RM-protected APIs.</div>}
+      {!!err && <div style={{ color:"#f87171", fontSize:12 }}>{err}</div>}
+      <div style={{
+        clipPath:"polygon(4% 0, 96% 0, 100% 12%, 100% 88%, 96% 100%, 4% 100%, 0 88%, 0 12%)",
+        border:"1px solid rgba(99,179,255,0.25)",
+        background:"rgba(99,179,255,0.06)",
+        padding:"16px 18px",
+        display:"grid",
+        gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",
+        gap:12,
+      }}>
+        <div style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(99,179,255,0.85)", fontWeight:800, gridColumn:"1 / -1" }}>
+          Live Customer Inputs (shared with Cross‑Sell)
+        </div>
+        <label style={{ fontSize:12 }}>Name
+          <input value={customerProfile.name} onChange={e=>setCustomerProfile(p=>({...p, name:e.target.value}))} className="glass-input" style={{ width:"100%", marginTop:6, background:"rgba(3,7,18,0.7)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.14)", borderRadius:10, padding:"10px 12px" }} />
+        </label>
+        <label style={{ fontSize:12 }}>Income ₹{customerProfile.income.toLocaleString("en-IN")}
+          <input type="range" min={25000} max={220000} step={1000} value={customerProfile.income} onChange={e=>setCustomerProfile(p=>({...p, income:Number(e.target.value)}))} style={{ width:"100%" }} />
+        </label>
+        <label style={{ fontSize:12 }}>Spending ₹{customerProfile.spending.toLocaleString("en-IN")}
+          <input type="range" min={8000} max={160000} step={1000} value={customerProfile.spending} onChange={e=>setCustomerProfile(p=>({...p, spending:Number(e.target.value)}))} style={{ width:"100%" }} />
+        </label>
+        <label style={{ fontSize:12 }}>Loans ₹{customerProfile.loans.toLocaleString("en-IN")}
+          <input type="range" min={0} max={120000} step={1000} value={customerProfile.loans} onChange={e=>setCustomerProfile(p=>({...p, loans:Number(e.target.value)}))} style={{ width:"100%" }} />
+        </label>
+        <label style={{ fontSize:12 }}>Credit {customerProfile.creditScore}
+          <input type="range" min={500} max={900} step={1} value={customerProfile.creditScore} onChange={e=>setCustomerProfile(p=>({...p, creditScore:Number(e.target.value)}))} style={{ width:"100%" }} />
+        </label>
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          <div style={{ fontSize:12 }}>Risk Level</div>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+            {["low","medium","high"].map((r)=>(
+              <button key={r} onClick={()=>setCustomerProfile(p=>({...p, riskLevel:r}))} style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:`1px solid ${customerProfile.riskLevel===r?"rgba(52,211,153,0.6)":"rgba(255,255,255,0.2)"}`, color:customerProfile.riskLevel===r?"#34d399":"rgba(226,234,255,0.7)", padding:"7px 10px", fontSize:11 }}>{r}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+      {summary?.customer && (
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }} className="sphere-row">
+          <FeatureShard title="Customer Snapshot" color="#63b3ff" items={Object.entries(summary.customer).map(([k,v]) => `${k}: ${v}`)} />
+          <FeatureShard title="Risk Flags + RM Recommendation" color="#fbbf24" items={[...(summary.flags || []).map((f)=>`${f.label}: ${f.value} (${f.color})`), summary.recommendation, `Why: ${summary.reason}`]} />
+        </div>
+      )}
+      <div style={{ clipPath:"polygon(7% 0,100% 0,93% 100%,0 100%)", border:"1px solid rgba(52,211,153,0.35)", background:"rgba(52,211,153,0.08)", padding:"16px 20px", display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+        <select value={selectedProduct} onChange={(e)=>setSelectedProduct(e.target.value)} style={{ background:"rgba(3,7,18,0.8)", color:"#e2eaff", border:"1px solid rgba(255,255,255,0.2)", padding:"8px 10px" }}>
+          <option>Secured Credit Card</option>
+          <option>Instant Personal Loan</option>
+          <option>Wealth Plus SIP</option>
+        </select>
+        <button onClick={getDecision} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"9px 14px", fontSize:12 }}>POST /rm/product-decision</button>
+      </div>
+      {decision && <FeatureShard title="Decision Reasoning" color={decision.allowed ? "#34d399" : "#f87171"} items={[`${decision.allowed ? "Allowed" : "Blocked"}: ${decision.recommendation}`, `Why ${decision.allowed ? "allowed" : "blocked"}: ${decision.reason}`]} />}
+    </div>
+  );
+}
+
+function PrivacyCompliance({ token, bankerToken }) {
+  const [data, setData] = useState(fallbackCompliance);
+  const load = async () => {
+    const d = await api.complianceStatus({ token: bankerToken || token });
+    setData(d);
+  };
+  useEffect(() => { load(); }, [token, bankerToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:18 }}>
+      <div style={{ fontSize:30, fontWeight:800 }}>⛨ <span style={{ background:"linear-gradient(135deg,#fbbf24,#63b3ff)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Privacy & Compliance</span></div>
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>{(data.badges || []).map((b) => <div key={b} style={{ clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)", border:"1px solid rgba(251,191,36,0.45)", background:"rgba(251,191,36,0.12)", color:"#fbbf24", padding:"8px 12px", fontSize:12 }}>{b}</div>)}</div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))", gap:14 }}>
+        <FeatureShard title="Data Used" color="#63b3ff" items={data.dataUsed || []} />
+        <FeatureShard title="Decision Logic" color="#34d399" items={[`Consent: ${data.consentStatus || "Unknown"}`, data.decisionExplainer || ""]} />
+        <FeatureShard title="Data Masking" color="#fbbf24" items={Object.entries(data.maskedPreview || {}).map(([k,v]) => `${k}: ${v}`)} />
+      </div>
+      <div style={{ position:"relative", marginTop:4 }}>
+        <div aria-hidden style={{
+          position:"absolute", inset:0,
+          clipPath:"polygon(5% 0,95% 0,100% 16%,100% 84%,95% 100%,5% 100%,0 84%,0 16%)",
+          border:"1px solid rgba(99,179,255,0.4)",
+          background:"rgba(99,179,255,0.08)",
+          boxShadow:"0 0 16px rgba(99,179,255,0.22)",
+          pointerEvents:"none",
+        }} />
+        <div style={{ position:"relative", padding:"18px 22px", paddingLeft:26 }}>
+          <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.11em", color:"#63b3ff", marginBottom:8, lineHeight:1.3 }}>Audit Logs</div>
+          {(data.auditLogs || []).length === 0 ? (
+            <div style={{ fontSize:13, color:"rgba(226,234,255,0.72)" }}>No logs yet. Generate feature actions first.</div>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {data.auditLogs.map((l,i)=>(
+                <div key={i} style={{
+                  border:"1px solid rgba(255,255,255,0.2)",
+                  background:"rgba(3,7,18,0.72)",
+                  padding:"8px 12px",
+                  fontSize:12,
+                  color:"rgba(226,234,255,0.86)",
+                  borderRadius:10,
+                }}>
+                  {l.ts} • {l.role} • {l.action} • {l.result}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <button onClick={load} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:"1px solid rgba(99,179,255,0.4)", background:"rgba(99,179,255,0.12)", color:"#e2eaff", padding:"9px 14px", fontSize:12 }}>Refresh Compliance</button>
+    </div>
+  );
+}
+
+function CrossSellEngine({ token, customerProfile, setCustomerProfile }) {
+  return <SmartCrossSell token={token} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />;
+}
+
+function RMCopilot({ token, bankerToken, setBankerToken, customerProfile, setCustomerProfile }) {
+  return <BankerRMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />;
+}
+
+function ComplianceLayer({ token, bankerToken }) {
+  return <PrivacyCompliance token={token} bankerToken={bankerToken} />;
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────
+function Settings({ user }) {
+  const [expandedSection, setExpandedSection] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(null);
+  const [newItem, setNewItem] = useState({});
+
+  // Sample data for insurances associated with bank
+  const [bankInsurances, setBankInsurances] = useState([
+    { id: 1, name: "Home Loan Protection Plan", provider: "HDFC Life", coverage: "₹50 Lakhs", premium: "₹2,450/month", status: "Active", nextRenewal: "2026-03-15" },
+    { id: 2, name: "Critical Illness Cover", provider: "ICICI Lombard", coverage: "₹25 Lakhs", premium: "₹1,800/month", status: "Active", nextRenewal: "2026-06-20" },
+    { id: 3, name: "Personal Loan Insurance", provider: "SBI Life", coverage: "₹10 Lakhs", premium: "₹850/month", status: "Active", nextRenewal: "2026-04-10" }
+  ]);
+
+  // Sample LIC policies
+  const [licPolicies, setLicPolicies] = useState([
+    { id: 1, name: "Jeevan Anand", policyNumber: "LA-890123456", sumAssured: "₹20 Lakhs", premium: "₹12,500/year", term: "25 years", maturity: "2045-03-01", status: "In Force" },
+    { id: 2, name: "Jeevan Lakshya", policyNumber: "LL-789012345", sumAssured: "₹15 Lakhs", premium: "₹8,600/year", term: "20 years", maturity: "2040-06-15", status: "In Force" }
+  ]);
+
+  // Sample other investments
+  const [investments, setInvestments] = useState([
+    { id: 1, name: "Public Provident Fund", type: "Government Scheme", amount: "₹1.5 Lakhs/year", current: "₹12.8 Lakhs", returns: "7.1%", status: "Active" },
+    { id: 2, name: "SBI Bluechip Fund", type: "Mutual Fund", amount: "₹5,000/month", current: "₹4.2 Lakhs", returns: "12.3%", status: "Active" },
+    { id: 3, name: "HDFC Mid-Cap Opportunities", type: "Mutual Fund", amount: "₹3,000/month", current: "₹2.1 Lakhs", returns: "15.8%", status: "Active" },
+    { id: 4, name: "National Savings Certificate", type: "Government Scheme", amount: "₹1 Lakhs/year", current: "₹3.5 Lakhs", returns: "6.8%", status: "Active" }
+  ]);
+
+  const toggleSection = (section) => {
+    setExpandedSection(expandedSection === section ? null : section);
+  };
+
+  const handleAddItem = (type) => {
+    setShowAddForm(type);
+    setNewItem({});
+  };
+
+  const handleSaveItem = (type) => {
+    const newId = Math.max(...(type === 'insurances' ? bankInsurances : type === 'lic' ? licPolicies : investments).map(item => item.id)) + 1;
+    
+    if (type === 'insurances') {
+      setBankInsurances([...bankInsurances, { 
+        id: newId, 
+        name: newItem.name || 'New Insurance Policy', 
+        provider: newItem.provider || 'Provider Name',
+        coverage: newItem.coverage || '₹10 Lakhs',
+        premium: newItem.premium || '₹1,000/month',
+        status: 'Active',
+        nextRenewal: newItem.nextRenewal || '2026-12-31'
+      }]);
+    } else if (type === 'lic') {
+      setLicPolicies([...licPolicies, { 
+        id: newId, 
+        name: newItem.name || 'New LIC Policy', 
+        policyNumber: newItem.policyNumber || 'LP-123456789',
+        sumAssured: newItem.sumAssured || '₹10 Lakhs',
+        premium: newItem.premium || '₹5,000/year',
+        term: newItem.term || '20 years',
+        maturity: newItem.maturity || '2040-01-01',
+        status: 'In Force'
+      }]);
+    } else if (type === 'investments') {
+      setInvestments([...investments, { 
+        id: newId, 
+        name: newItem.name || 'New Investment', 
+        type: newItem.type || 'Investment Type',
+        amount: newItem.amount || '₹1,000/month',
+        current: newItem.current || '₹12,000',
+        returns: newItem.returns || '8%',
+        status: 'Active'
+      }]);
+    }
+    
+    setShowAddForm(null);
+    setNewItem({});
+  };
+
+  return (
+    <div style={{ animation:"fadeIn 0.4s ease" }}>
+      <div style={{ fontSize:28, fontWeight:800, marginBottom:24 }}>⚙ <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Settings</span></div>
+      <div style={{ display:"flex", gap:48, alignItems:"flex-start", flexWrap:"wrap" }}>
+        <AstroSphere size={180} color1="#1a3a8e" color2="#0d1f6e" glowColor="#63b3ff" animate />
+        <div style={{ flex:1, minWidth:320 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:28, paddingBottom:24, borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ width:56, height:56, borderRadius:"50%", background:"linear-gradient(135deg,#1a3a8e,#2d1a8e)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, fontWeight:800, boxShadow:"0 0 24px rgba(99,179,255,0.3)" }}>
+              <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{user.name[0]}</span>
+            </div>
+            <div>
+              <div style={{ fontWeight:700, fontSize:17 }}>{user.name}</div>
+              <div style={{ color:"rgba(226,234,255,0.35)", fontSize:12, fontFamily:"'JetBrains Mono', monospace" }}>{user.email}</div>
+              <div style={{ marginTop:6, display:"inline-block", padding:"3px 10px", background:"rgba(52,211,153,0.1)", color:"#34d399", borderRadius:20, fontSize:10, fontWeight:700 }}>VERIFIED</div>
+            </div>
+          </div>
+          
+          {/* Basic Settings */}
+          {[
+            ["Two-Factor Auth","OTP Enabled","#34d399"],
+            ["Notifications","Email + Push","#63b3ff"],
+            ["Currency","INR (₹)","#e2eaff"],
+            ["Encryption","AES-256","#a78bfa"],
+            ["Last Login",user.lastLogin,"rgba(226,234,255,0.4)"]
+          ].map(([l,v,c]) => (
+            <div key={l} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 0", borderBottom:"1px solid rgba(255,255,255,0.04)" }}>
+              <span style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.35)" }}>{l}</span>
+              <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:13, color:c, fontWeight:600 }}>{v}</span>
+            </div>
+          ))}
+
+          {/* Bank Insurances Section */}
+          <div style={{ marginTop:24, padding:"16px 0", borderTop:"1px solid rgba(255,255,255,0.08)" }}>
+            <div 
+              onClick={() => toggleSection('insurances')}
+              style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", padding:"8px 0", transition:"all 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.opacity = "0.8"}
+              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+            >
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <span style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.35)" }}>Bank Insurances</span>
+                <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:13, color:"#34d399", fontWeight:600 }}>{bankInsurances.length} Active</span>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleAddItem('insurances'); }}
+                  style={{
+                    padding:"4px 10px",
+                    background:"rgba(52,211,153,0.15)",
+                    border:"1px solid rgba(52,211,153,0.3)",
+                    borderRadius:6,
+                    color:"#34d399",
+                    fontSize:11,
+                    fontWeight:600,
+                    cursor:"pointer",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(52,211,153,0.25)"; e.currentTarget.style.borderColor = "rgba(52,211,153,0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(52,211,153,0.15)"; e.currentTarget.style.borderColor = "rgba(52,211,153,0.3)"; }}
+                >
+                  + Add
+                </button>
+                <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'insurances' ? '▼' : '▶'}</span>
+              </div>
+            </div>
+            
+            {expandedSection === 'insurances' && (
+              <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:12 }}>
+                {bankInsurances.map(insurance => (
+                  <div key={insurance.id} style={{
+                    background:"rgba(255,255,255,0.03)",
+                    border:"1px solid rgba(52,211,153,0.2)",
+                    borderRadius:12,
+                    padding:16,
+                    transition:"all 0.2s"
+                  }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                      <div>
+                        <div style={{ fontWeight:600, fontSize:14, color:"#e2eaff", marginBottom:4 }}>{insurance.name}</div>
+                        <div style={{ fontSize:12, color:"rgba(226,234,255,0.5)", fontFamily:"'JetBrains Mono', monospace" }}>{insurance.provider}</div>
+                      </div>
+                      <div style={{ padding:"4px 8px", background:"rgba(52,211,153,0.15)", color:"#34d399", borderRadius:6, fontSize:10, fontWeight:600 }}>
+                        {insurance.status}
+                      </div>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, fontSize:11, color:"rgba(226,234,255,0.6)" }}>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Coverage:</span> {insurance.coverage}</div>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Premium:</span> {insurance.premium}</div>
+                      <div style={{ gridColumn:"span 2" }}><span style={{ color:"rgba(226,234,255,0.4)" }}>Next Renewal:</span> {insurance.nextRenewal}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* LIC Policies Section */}
+          <div style={{ marginTop:16, padding:"16px 0", borderTop:"1px solid rgba(255,255,255,0.08)" }}>
+            <div 
+              onClick={() => toggleSection('lic')}
+              style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", padding:"8px 0", transition:"all 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.opacity = "0.8"}
+              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+            >
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <span style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.35)" }}>LIC Policies</span>
+                <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:13, color:"#fbbf24", fontWeight:600 }}>{licPolicies.length} Active</span>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleAddItem('lic'); }}
+                  style={{
+                    padding:"4px 10px",
+                    background:"rgba(251,191,36,0.15)",
+                    border:"1px solid rgba(251,191,36,0.3)",
+                    borderRadius:6,
+                    color:"#fbbf24",
+                    fontSize:11,
+                    fontWeight:600,
+                    cursor:"pointer",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(251,191,36,0.25)"; e.currentTarget.style.borderColor = "rgba(251,191,36,0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(251,191,36,0.15)"; e.currentTarget.style.borderColor = "rgba(251,191,36,0.3)"; }}
+                >
+                  + Add
+                </button>
+                <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'lic' ? '▼' : '▶'}</span>
+              </div>
+            </div>
+            
+            {expandedSection === 'lic' && (
+              <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:12 }}>
+                {licPolicies.map(policy => (
+                  <div key={policy.id} style={{
+                    background:"rgba(255,255,255,0.03)",
+                    border:"1px solid rgba(251,191,36,0.2)",
+                    borderRadius:12,
+                    padding:16,
+                    transition:"all 0.2s"
+                  }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                      <div>
+                        <div style={{ fontWeight:600, fontSize:14, color:"#e2eaff", marginBottom:4 }}>{policy.name}</div>
+                        <div style={{ fontSize:12, color:"rgba(226,234,255,0.5)", fontFamily:"'JetBrains Mono', monospace" }}>{policy.policyNumber}</div>
+                      </div>
+                      <div style={{ padding:"4px 8px", background:"rgba(251,191,36,0.15)", color:"#fbbf24", borderRadius:6, fontSize:10, fontWeight:600 }}>
+                        {policy.status}
+                      </div>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, fontSize:11, color:"rgba(226,234,255,0.6)" }}>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Sum Assured:</span> {policy.sumAssured}</div>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Premium:</span> {policy.premium}</div>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Term:</span> {policy.term}</div>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Maturity:</span> {policy.maturity}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Other Investments Section */}
+          <div style={{ marginTop:16, padding:"16px 0", borderTop:"1px solid rgba(255,255,255,0.08)" }}>
+            <div 
+              onClick={() => toggleSection('investments')}
+              style={{ display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", padding:"8px 0", transition:"all 0.2s" }}
+              onMouseEnter={e => e.currentTarget.style.opacity = "0.8"}
+              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+            >
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <span style={{ fontSize:11, textTransform:"uppercase", letterSpacing:"0.08em", color:"rgba(226,234,255,0.35)" }}>Other Investments</span>
+                <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:13, color:"#a78bfa", fontWeight:600 }}>{investments.length} Active</span>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleAddItem('investments'); }}
+                  style={{
+                    padding:"4px 10px",
+                    background:"rgba(167,139,250,0.15)",
+                    border:"1px solid rgba(167,139,250,0.3)",
+                    borderRadius:6,
+                    color:"#a78bfa",
+                    fontSize:11,
+                    fontWeight:600,
+                    cursor:"pointer",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(167,139,250,0.25)"; e.currentTarget.style.borderColor = "rgba(167,139,250,0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(167,139,250,0.15)"; e.currentTarget.style.borderColor = "rgba(167,139,250,0.3)"; }}
+                >
+                  + Add
+                </button>
+                <span style={{ color:"rgba(226,234,255,0.4)", fontSize:16 }}>{expandedSection === 'investments' ? '▼' : '▶'}</span>
+              </div>
+            </div>
+            
+            {expandedSection === 'investments' && (
+              <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:12 }}>
+                {investments.map(investment => (
+                  <div key={investment.id} style={{
+                    background:"rgba(255,255,255,0.03)",
+                    border:"1px solid rgba(167,139,250,0.2)",
+                    borderRadius:12,
+                    padding:16,
+                    transition:"all 0.2s"
+                  }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
+                      <div>
+                        <div style={{ fontWeight:600, fontSize:14, color:"#e2eaff", marginBottom:4 }}>{investment.name}</div>
+                        <div style={{ fontSize:12, color:"rgba(226,234,255,0.5)", fontFamily:"'JetBrains Mono', monospace" }}>{investment.type}</div>
+                      </div>
+                      <div style={{ textAlign:"right" }}>
+                        <div style={{ padding:"4px 8px", background:"rgba(167,139,250,0.15)", color:"#a78bfa", borderRadius:6, fontSize:10, fontWeight:600, marginBottom:4 }}>
+                          {investment.status}
+                        </div>
+                        <div style={{ fontSize:12, color:"#34d399", fontWeight:600 }}>{investment.returns}</div>
+                      </div>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, fontSize:11, color:"rgba(226,234,255,0.6)" }}>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Contribution:</span> {investment.amount}</div>
+                      <div><span style={{ color:"rgba(226,234,255,0.4)" }}>Current Value:</span> {investment.current}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Add Item Modal */}
+      {showAddForm && (
+        <div style={{
+          position:"fixed",
+          inset:0,
+          background:"rgba(3,7,18,0.85)",
+          backdropFilter:"blur(8px)",
+          display:"flex",
+          alignItems:"center",
+          justifyContent:"center",
+          zIndex:1000
+        }}>
+          <div style={{
+            background:"rgba(15,23,42,0.95)",
+            border:"1px solid rgba(99,179,255,0.2)",
+            borderRadius:20,
+            padding:32,
+            width:"90%",
+            maxWidth:500,
+            boxShadow:"0 40px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)"
+          }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+              <div style={{ fontSize:20, fontWeight:700 }}>
+                Add New {showAddForm === 'insurances' ? 'Insurance' : showAddForm === 'lic' ? 'LIC Policy' : 'Investment'}
+              </div>
+              <button
+                onClick={() => setShowAddForm(null)}
+                style={{
+                  width:32, height:32,
+                  borderRadius:"50%",
+                  background:"rgba(255,255,255,0.1)",
+                  border:"1px solid rgba(255,255,255,0.2)",
+                  color:"rgba(226,234,255,0.6)",
+                  fontSize:16,
+                  cursor:"pointer",
+                  transition:"all 0.2s"
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.15)"; e.currentTarget.style.color = "rgba(226,234,255,0.8)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "rgba(226,234,255,0.6)"; }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+              {showAddForm === 'insurances' && (
+                <>
+                  <input
+                    placeholder="Insurance Name"
+                    value={newItem.name || ''}
+                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Provider"
+                    value={newItem.provider || ''}
+                    onChange={(e) => setNewItem({...newItem, provider: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Coverage Amount"
+                    value={newItem.coverage || ''}
+                    onChange={(e) => setNewItem({...newItem, coverage: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Premium"
+                    value={newItem.premium || ''}
+                    onChange={(e) => setNewItem({...newItem, premium: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                </>
+              )}
+
+              {showAddForm === 'lic' && (
+                <>
+                  <input
+                    placeholder="Policy Name"
+                    value={newItem.name || ''}
+                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Policy Number"
+                    value={newItem.policyNumber || ''}
+                    onChange={(e) => setNewItem({...newItem, policyNumber: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Sum Assured"
+                    value={newItem.sumAssured || ''}
+                    onChange={(e) => setNewItem({...newItem, sumAssured: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Premium"
+                    value={newItem.premium || ''}
+                    onChange={(e) => setNewItem({...newItem, premium: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                </>
+              )}
+
+              {showAddForm === 'investments' && (
+                <>
+                  <input
+                    placeholder="Investment Name"
+                    value={newItem.name || ''}
+                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Investment Type"
+                    value={newItem.type || ''}
+                    onChange={(e) => setNewItem({...newItem, type: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Contribution Amount"
+                    value={newItem.amount || ''}
+                    onChange={(e) => setNewItem({...newItem, amount: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                  <input
+                    placeholder="Current Value"
+                    value={newItem.current || ''}
+                    onChange={(e) => setNewItem({...newItem, current: e.target.value})}
+                    style={{
+                      padding:"12px 16px",
+                      background:"rgba(255,255,255,0.05)",
+                      border:"1px solid rgba(255,255,255,0.1)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:14
+                    }}
+                  />
+                </>
+              )}
+
+              <div style={{ display:"flex", gap:12, marginTop:8 }}>
+                <button
+                  onClick={() => setShowAddForm(null)}
+                  style={{
+                    flex:1,
+                    padding:"14px",
+                    background:"transparent",
+                    border:"1px solid rgba(255,255,255,0.2)",
+                    borderRadius:10,
+                    color:"rgba(226,234,255,0.6)",
+                    fontSize:14,
+                    fontWeight:600,
+                    cursor:"pointer",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleSaveItem(showAddForm)}
+                  style={{
+                    flex:1,
+                    padding:"14px",
+                    background:"linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))",
+                    border:"1px solid rgba(99,179,255,0.4)",
+                    borderRadius:10,
+                    color:"#e2eaff",
+                    fontSize:14,
+                    fontWeight:600,
+                    cursor:"pointer",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(99,179,255,0.3),rgba(167,139,250,0.3))"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.6)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(99,179,255,0.2),rgba(167,139,250,0.2))"; e.currentTarget.style.borderColor = "rgba(99,179,255,0.4)"; }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── BOTTOM NAV (mobile) ───────────────────────────────────────
+const BOTTOM_NAV = [
+  { id:"home",     icon:"⬡", label:"Home"    },
+  { id:"astrofin", icon:"◈", label:"Twin"    },
+  { id:"creditai", icon:"◆", label:"Credit"  },
+  { id:"loan",     icon:"↯", label:"Loan"    },
+  { id:"ai",       icon:"✦", label:"Astro"   },
+];
+
+function BottomNav({ active, setActive }) {
+  // Show only 5 most used on mobile, rest hidden
+  const visible = BOTTOM_NAV.slice(0, 5);
+  return (
+    <nav className="bottom-nav" style={{
+      position:"fixed", bottom:0, left:0, right:0, zIndex:50,
+      background:"rgba(3,7,18,0.95)", backdropFilter:"blur(20px)",
+      borderTop:"1px solid rgba(255,255,255,0.07)",
+      padding:"8px 4px calc(8px + env(safe-area-inset-bottom))",
+      alignItems:"center", justifyContent:"space-around",
+      display:"none", // toggled by CSS media query
+    }}>
+      {visible.map(n => {
+        const isA = active === n.id;
+        return (
+          <button key={n.id} onClick={() => setActive(n.id)} style={{
+            display:"flex", flexDirection:"column", alignItems:"center", gap:4,
+            padding:"6px 12px", borderRadius:12, background:"none",
+            color: isA ? "#63b3ff" : "rgba(226,234,255,0.35)",
+            fontFamily:"'Syne', sans-serif", fontSize:10, fontWeight: isA ? 700 : 400,
+            transition:"all 0.15s", border:"none", minWidth:52,
+          }}>
+            <span style={{ fontSize:20, filter: isA ? "drop-shadow(0 0 6px #63b3ff)" : "none", transition:"filter 0.2s" }}>{n.icon}</span>
+            <span style={{ letterSpacing:"0.04em" }}>{n.label}</span>
+            {isA && <div style={{ width:4, height:4, borderRadius:"50%", background:"#63b3ff", boxShadow:"0 0 5px #63b3ff", marginTop:1 }} />}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+// ── INNOVATIVE WIDGETS ────────────────────────────────────────
+
+// Hexagonal news tile
+function HexNews({ title, cat, time, sentiment, delay }) {
+  const borderColor = sentiment === "bullish" ? "#34d399" : sentiment === "bearish" ? "#f87171" : "#63b3ff";
   return (
     <div style={{
-      padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-      borderRadius: 12, fontSize: 12, color: "#e2eaff", lineHeight: 1.5,
-      animation: `fadeUp 0.4s ease ${delay}s both`,
-      borderLeft: `3px solid ${colors[sentiment]}`,
-    }}>
-      <div style={{ fontWeight: 600, marginBottom: 4, color: colors[sentiment] }}>{title}</div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(226,234,255,0.4)" }}>
-        <span>{cat}</span>
-        <span>{time}</span>
+      position:"relative", width:280, minHeight:178,
+      clipPath:"polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%)",
+      background:"rgba(255,255,255,0.045)",
+      border:`1px solid ${borderColor}45`,
+      padding:"24px 18px", display:"flex", alignItems:"center", justifyContent:"center",
+      animation:`fadeUp 0.4s ease ${delay}s both`,
+      transition:"all 0.2s",
+      boxShadow:`0 0 22px ${borderColor}22`,
+    }}
+      onMouseEnter={e => { e.currentTarget.style.background = `${borderColor}10`; e.currentTarget.style.borderColor = `${borderColor}60`; }}
+      onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = `${borderColor}30`; }}
+    >
+      <div style={{ width:"78%", minWidth:0 }}>
+        <div style={{ fontSize:13, textTransform:"uppercase", letterSpacing:"0.14em", color:`${borderColor}`, marginBottom:10, fontWeight:800 }}>{cat}</div>
+        <div style={{
+          fontSize:21, lineHeight:1.42, marginBottom:10, fontWeight:800, color:"#eef6ff",
+          textShadow:"0 0 10px rgba(0,0,0,0.35)",
+          display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden",
+        }}>{title}</div>
+        <div style={{ fontSize:13, color:"rgba(226,234,255,0.7)", fontFamily:"'JetBrains Mono', monospace", fontWeight:600 }}>{time}</div>
       </div>
     </div>
   );
 }
 
+// Diagonal stock ticker
 function StockTicker({ ticker, price, change, color }) {
   return (
-    <div style={{ 
-      padding: "14px 18px", 
-      background: "rgba(255,255,255,0.03)", 
-      border: "1px solid rgba(255,255,255,0.06)",
-      borderRadius: 12, 
-      display: "flex", 
-      justifyContent: "space-between", 
-      alignItems: "center" 
-    }}>
-      <div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#e2eaff" }}>{ticker}</div>
-        <div style={{ fontSize: 16, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: "#e2eaff" }}>
-          ₹{price.toLocaleString("en-IN")}
-        </div>
+    <div style={{
+      background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.05)",
+      borderLeft:`3px solid ${color}`,
+      padding:"10px 14px", borderRadius:10,
+      display:"flex", justifyContent:"space-between", alignItems:"center",
+      transform:"skewX(-2deg)", transition:"all 0.2s",
+    }}
+      onMouseEnter={e => e.currentTarget.style.transform = "skewX(-2deg) translateX(4px)"}
+      onMouseLeave={e => e.currentTarget.style.transform = "skewX(-2deg)"}
+    >
+      <div style={{ transform:"skewX(2deg)" }}>
+        <div style={{ fontSize:12, fontWeight:800, fontFamily:"'JetBrains Mono', monospace", marginBottom:2 }}>{ticker}</div>
+        <div style={{ fontSize:16, fontWeight:800, color }}>{change > 0 ? "+" : ""}{change}%</div>
       </div>
-      <div style={{ 
-        padding: "4px 8px", 
-        borderRadius: 6, 
-        background: `${color}15`, 
-        color: color, 
-        fontSize: 11, 
-        fontWeight: 700,
-        fontFamily: "'JetBrains Mono', monospace"
+      <div style={{ fontSize:18, fontWeight:800, fontFamily:"'JetBrains Mono', monospace", color:"rgba(226,234,255,0.6)", transform:"skewX(2deg)" }}>
+        ₹{price.toLocaleString("en-IN")}
+      </div>
+    </div>
+  );
+}
+
+// Expandable "Did You Know" pill
+function KnowledgePill({ question, answer, delay }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{
+      background:open?"rgba(99,179,255,0.06)":"rgba(255,255,255,0.03)",
+      border:open?"1px solid rgba(99,179,255,0.2)":"1px solid rgba(255,255,255,0.06)",
+      borderRadius:16, padding:open?"16px 18px":"12px 16px",
+      cursor:"pointer", transition:"all 0.3s ease",
+      animation:`fadeUp 0.3s ease ${delay}s both`,
+      overflow:"hidden",
+    }} onClick={()=>setOpen(!open)}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, flex:1 }}>
+          <span style={{ fontSize:16, filter:"drop-shadow(0 0 4px #63b3ff)" }}>💡</span>
+          <span style={{ fontSize:16, fontWeight:700, lineHeight:1.4 }}>{question}</span>
+        </div>
+        <span style={{ fontSize:16, color:"rgba(226,234,255,0.4)", transition:"transform 0.3s", transform:open?"rotate(180deg)":"rotate(0)" }}>▼</span>
+      </div>
+      <div style={{
+        maxHeight:open?200:0, opacity:open?1:0,
+        transition:"all 0.3s ease", overflow:"hidden",
+        marginTop:open?12:0,
       }}>
-        {change > 0 ? "+" : ""}{change}%
+        <div style={{ fontSize:15, lineHeight:1.75, color:"rgba(226,234,255,0.72)", borderTop:"1px solid rgba(255,255,255,0.05)", paddingTop:12 }}>
+          {answer}
+        </div>
       </div>
     </div>
   );
@@ -2086,175 +3479,543 @@ function StockTicker({ ticker, price, change, color }) {
 function DoYouKnowButton({ question, answer }) {
   const [open, setOpen] = useState(false);
   return (
-    <button 
-      onClick={() => setOpen(!open)}
-      style={{
-        padding: "12px 16px",
-        background: open ? "rgba(99,179,255,0.08)" : "rgba(255,255,255,0.03)",
-        border: open ? "1px solid rgba(99,179,255,0.2)" : "1px solid rgba(255,255,255,0.06)",
-        borderRadius: 12,
-        textAlign: "left",
-        fontSize: 12,
-        color: "#e2eaff",
-        cursor: "pointer",
-        transition: "all 0.2s",
-        width: "100%"
-      }}
-    >
-      <div style={{ fontWeight: 600, marginBottom: open ? 8 : 0 }}>Q: {question}</div>
-      {open && <div style={{ color: "rgba(226,234,255,0.7)", lineHeight: 1.5 }}>A: {answer}</div>}
-    </button>
-  );
-}
-
-function KnowledgePill({ question, answer, delay = 0 }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{
-      padding: "12px 16px",
-      background: open ? "rgba(167,139,250,0.08)" : "rgba(255,255,255,0.03)",
-      border: open ? "1px solid rgba(167,139,250,0.2)" : "1px solid rgba(255,255,255,0.06)",
-      borderRadius: 12,
-      fontSize: 12,
-      color: "#e2eaff",
-      cursor: "pointer",
-      transition: "all 0.2s",
-      animation: `fadeUp 0.4s ease ${delay}s both`,
-    }}
-      onClick={() => setOpen(!open)}
-    >
-      <div style={{ fontWeight: 600, marginBottom: open ? 8 : 0 }}>Q: {question}</div>
-      {open && <div style={{ color: "rgba(226,234,255,0.7)", lineHeight: 1.5 }}>A: {answer}</div>}
+    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          padding:"12px 18px",
+          color:"#63b3ff",
+          fontSize:12,
+          fontWeight:700,
+          letterSpacing:"0.08em",
+          textTransform:"uppercase",
+          background:"rgba(99,179,255,0.08)",
+          border:"1px solid rgba(99,179,255,0.3)",
+          clipPath:"polygon(8% 0, 92% 0, 100% 50%, 92% 100%, 8% 100%, 0 50%)",
+          transition:"all 0.2s ease",
+        }}
+      >
+        Do You Know
+      </button>
+      {open && (
+        <div style={{ fontSize:12, lineHeight:1.7, color:"rgba(226,234,255,0.6)", padding:"0 6px" }}>
+          <div style={{ color:"#e2eaff", fontWeight:700, marginBottom:4 }}>{question}</div>
+          {answer}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── MAIN APP COMPONENT ───────────────────────────────────────────
-function App() {
-  const [page, setPage] = useState("home");
-  const [token, setToken] = useState("");
-  const [bankerToken, setBankerToken] = useState("");
-  const [profile, setProfile] = useState(null);
-  const [updates, setUpdates] = useState(null);
-  const [featureModules, setFeatureModules] = useState(null);
+// Investor Profile card
+function InvestorProfile({ name, title, quote, achievement, company, skills = [], experience, photoUrl, delay }) {
+  return (
+    <div style={{
+      background:"rgba(255,255,255,0.025)", border:"1px solid rgba(255,255,255,0.06)",
+      borderRadius:16, padding:"20px 24px", animation:`fadeUp 0.5s ease ${delay || 0}s both`,
+    }}>
+      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:14 }}>
+        {photoUrl ? (
+          <img
+            src={photoUrl}
+            alt={name}
+            width={56}
+            height={56}
+            style={{
+              width:56, height:56, borderRadius:"50%",
+              objectFit:"cover",
+              border:"1px solid rgba(255,255,255,0.12)",
+              boxShadow:"0 0 20px rgba(99,179,255,0.18)",
+              flexShrink:0,
+            }}
+          />
+        ) : (
+          <div style={{
+            width:56, height:56, borderRadius:"50%",
+            background:"linear-gradient(135deg, #1a3a8e, #2d1a8e)",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            fontSize:24, fontWeight:800, flexShrink:0,
+            boxShadow:"0 0 20px rgba(99,179,255,0.25)",
+          }}>
+            <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{name[0]}</span>
+          </div>
+        )}
+        <div>
+          <div style={{ fontSize:15, fontWeight:700 }}>{name}</div>
+          <div style={{ fontSize:11, color:"rgba(226,234,255,0.4)", marginTop:2 }}>
+            {title}{company ? ` • ${company}` : ""}
+          </div>
+          {!!experience && (
+            <div style={{ fontSize:10, color:"rgba(226,234,255,0.32)", marginTop:4, fontFamily:"'JetBrains Mono', monospace" }}>
+              {experience}
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={{
+        fontSize:13, lineHeight:1.7, color:"rgba(226,234,255,0.6)",
+        fontStyle:"italic", marginBottom:12, paddingLeft:12,
+        borderLeft:"2px solid rgba(99,179,255,0.2)",
+      }}>
+        "{quote}"
+      </div>
+      {skills?.length > 0 && (
+        <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:12 }}>
+          {skills.slice(0, 5).map((s) => (
+            <div key={s} style={{
+              clipPath:"polygon(14% 0,100% 0,86% 100%,0 100%)",
+              border:"1px solid rgba(99,179,255,0.2)",
+              background:"rgba(99,179,255,0.06)",
+              padding:"6px 10px",
+              fontSize:10,
+              color:"rgba(226,234,255,0.7)",
+              fontFamily:"'JetBrains Mono', monospace",
+            }}>{s}</div>
+          ))}
+        </div>
+      )}
+      <div style={{
+        fontSize:11, color:"rgba(99,179,255,0.7)", padding:"8px 12px",
+        background:"rgba(99,179,255,0.05)", borderRadius:10,
+        border:"1px solid rgba(99,179,255,0.12)",
+      }}>
+        💡 {achievement}
+      </div>
+    </div>
+  );
+}
+
+const INVESTORS = [
+  {
+    name: "Ashneer Grover",
+    company: "BharatPe",
+    title: "Fintech Entrepreneur & Angel Investor",
+    experience: "10+ yrs in consumer fintech",
+    skills: ["Fintech GTM", "Unit economics", "Payments", "Product growth", "Risk"],
+    quote: "Distribution + underwriting discipline wins in retail finance.",
+    achievement: "Scaled high-velocity fintech with focus on CAC payback and fraud controls.",
+  },
+  {
+    name: "Anupam Mittal",
+    company: "Shaadi.com",
+    title: "Founder & Investor",
+    experience: "20+ yrs consumer internet",
+    skills: ["Brand", "Consumer product", "Pricing", "Growth loops", "Hiring"],
+    quote: "Build a product people love, then scale the system behind it.",
+    achievement: "Helped multiple startups sharpen positioning and retention-led growth.",
+  },
+  {
+    name: "Namita Thapar",
+    company: "Emcure Pharmaceuticals",
+    title: "Executive Director & Investor",
+    experience: "15+ yrs operations & scaling",
+    skills: ["Operations", "Compliance", "Go-to-market", "Leadership", "Execution"],
+    quote: "Great businesses execute relentlessly—especially on compliance and trust.",
+    achievement: "Strong focus on governance, process, and sustainable growth.",
+  },
+  {
+    name: "Falguni Nayar",
+    company: "Nykaa",
+    title: "Founder & Investor",
+    experience: "25+ yrs finance & consumer",
+    skills: ["Retail fintech", "Trust", "Customer experience", "Marketplace ops", "Capital strategy"],
+    quote: "Trust compounds. Build it into every customer interaction.",
+    achievement: "Built a category leader with high repeat usage and strong unit economics.",
+  },
+  {
+    name: "Kiran Mazumdar-Shaw",
+    company: "Biocon",
+    title: "Founder & Investor",
+    experience: "30+ yrs enterprise building",
+    skills: ["Long-term strategy", "Governance", "R&D discipline", "Scaling", "Resilience"],
+    quote: "Strong governance and long-term thinking are competitive advantages.",
+    achievement: "Proven playbook for building durable, regulation-friendly companies.",
+  },
+  {
+    name: "Nithin Kamath",
+    company: "Zerodha",
+    title: "Founder & Investor",
+    experience: "15+ yrs brokerage & investing",
+    skills: ["Investing", "Risk", "Customer support", "Operational efficiency", "Simplicity"],
+    quote: "Simple products + transparent pricing earn long-term loyalty.",
+    achievement: "Scaled a lean, profitable financial services business with trust-first product design.",
+  },
+];
+
+function avatarUrl(name) {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D1F6E&color=E2EAFF&size=128&bold=true`;
+}
+
+function pickInvestors(seed = "") {
+  const s = `${seed}`;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const a = h % INVESTORS.length;
+  const b = (a + 2 + (h % 3)) % INVESTORS.length;
+  return [INVESTORS[a], INVESTORS[b]];
+}
+
+function InvestorsShowcase({ featureId, title = "Investor Lens" }) {
+  const picks = pickInvestors(featureId).map((p) => ({ ...p, photoUrl: avatarUrl(p.name) }));
+  return (
+    <div style={{ marginTop:18, display:"flex", flexDirection:"column", gap:10 }}>
+      <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(167,139,250,0.75)" }}>{title}</div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))", gap:12 }}>
+        {picks.map((inv, i) => (
+          <InvestorProfile key={`${featureId}-${inv.name}`} {...inv} delay={i * 0.08} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Voice Assistant component for Ask Astro  
+function VoiceAssistant() {
+  const [listening, setListening] = useState(false);
+  const [thinking, setThinking] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [reply, setReply] = useState("");
+  const [err, setErr] = useState("");
+
+  const toggleListen = () => {
+    if (listening) {
+      setListening(false);
+      return;
+    }
+    const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Rec) {
+      setErr("Speech recognition is not supported in this browser.");
+      return;
+    }
+    setErr("");
+    setReply("");
+    setTranscript("");
+    setThinking(false);
+    setListening(true);
+    const rec = new Rec();
+    rec.lang = "en-US";
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    rec.onresult = async (event) => {
+      const text = Array.from(event.results).map((r) => r[0]?.transcript || "").join(" ").trim();
+      setTranscript(text);
+      if (event.results[event.results.length - 1]?.isFinal && text) {
+        try {
+          setThinking(true);
+          const r = await api.voiceReply({ transcript: text });
+          setReply(r.reply || "");
+          if (r.reply && window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(r.reply);
+            u.rate = 1;
+            u.pitch = 1;
+            window.speechSynthesis.speak(u);
+          }
+        } catch {
+          setErr("Could not fetch voice reply. Please try again.");
+        } finally {
+          setThinking(false);
+        }
+      }
+    };
+    rec.onerror = () => {
+      setErr("Microphone error. Please allow mic access and retry.");
+      setListening(false);
+    };
+    rec.onend = () => setListening(false);
+    rec.start();
+  };
+
+  return (
+    <div style={{
+      background:"rgba(99,179,255,0.04)", border:"1px solid rgba(99,179,255,0.15)",
+      borderRadius:16, padding:"20px 24px", textAlign:"center",
+    }}>
+      <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>🎤 Voice Assistant</div>
+      <button onClick={toggleListen} style={{
+        width:80, height:80, borderRadius:"50%",
+        background: listening ? "linear-gradient(135deg, #34d399, #63b3ff)" : "rgba(255,255,255,0.05)",
+        border: listening ? "none" : "2px solid rgba(99,179,255,0.3)",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize:32, margin:"0 auto 16px",
+        transition:"all 0.3s", cursor:"pointer",
+        animation: listening ? "orbPulse 1.5s ease-in-out infinite" : "none",
+        boxShadow: listening ? "0 0 30px rgba(52,211,153,0.5)" : "none",
+      }}>
+        {listening ? "🔊" : "🎤"}
+      </button>
+      <div style={{ fontSize:12, color:"rgba(226,234,255,0.5)", minHeight:40 }}>
+        {listening ? (
+          <div style={{ animation:"blink 1s ease-in-out infinite" }}>Listening...</div>
+        ) : thinking ? (
+          <div style={{ animation:"blink 1s ease-in-out infinite", color:"#63b3ff" }}>Thinking...</div>
+        ) : transcript ? (
+          <div style={{ color:"#63b3ff" }}>"{transcript}"</div>
+        ) : (
+          "Tap mic to speak"
+        )}
+      </div>
+      {!!reply && <div style={{ fontSize:12, color:"rgba(52,211,153,0.9)", marginTop:8, lineHeight:1.6 }}>{reply}</div>}
+      {!!err && <div style={{ fontSize:11, color:"#f87171", marginTop:8 }}>{err}</div>}
+    </div>
+  );
+}
+
+// ── CREDIT SCORE IMPROVER PAGE ────────────────────────────────
+function CreditScore({ user }) {
+  const currentScore = 720;
+  const targetScore = 800;
+  const maxScore = 900;
+  const progress = (currentScore - 300) / (maxScore - 300);
+  const targetProgress = (targetScore - 300) / (maxScore - 300);
+
+  const actions = [
+    { task: "Pay credit card bills on time", impact: "+15 pts", status: "pending", color: "#fbbf24" },
+    { task: "Reduce credit utilization to <30%", impact: "+20 pts", status: "in-progress", color: "#63b3ff" },
+    { task: "Don't apply for new credit", impact: "+10 pts", status: "done", color: "#34d399" },
+    { task: "Check for report errors", impact: "+5 pts", status: "pending", color: "#fbbf24" },
+    { task: "Maintain old credit accounts", impact: "+8 pts", status: "done", color: "#34d399" },
+    { task: "Diversify credit mix", impact: "+12 pts", status: "in-progress", color: "#63b3ff" },
+  ];
+
+  return (
+    <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:32 }}>
+      <div>
+        <div style={{ fontSize:28, fontWeight:800, marginBottom:6 }}>◆ AI Credit <span style={{ background:"linear-gradient(135deg,#34d399,#63b3ff)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Score Improver</span></div>
+        <div style={{ color:"rgba(226,234,255,0.35)", fontFamily:"'JetBrains Mono', monospace", fontSize:11 }}>// boost your creditworthiness with AI-powered recommendations</div>
+      </div>
+
+      {/* Main arc gauge + actions */}
+      <div className="sphere-row" style={{ display:"flex", gap:48, alignItems:"center", flexWrap:"wrap" }}>
+        {/* Animated arc gauge */}
+        <div style={{ position:"relative", flexShrink:0 }}>
+          <svg width={280} height={180} style={{ overflow:"visible" }}>
+            <defs>
+              <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#f87171" />
+                <stop offset="50%" stopColor="#fbbf24" />
+                <stop offset="100%" stopColor="#34d399" />
+              </linearGradient>
+            </defs>
+            {/* Background arc */}
+            <path d="M 40 150 A 100 100 0 0 1 240 150" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="20" strokeLinecap="round" />
+            {/* Progress arc */}
+            <path d="M 40 150 A 100 100 0 0 1 240 150" fill="none" stroke="url(#scoreGrad)" strokeWidth="20" strokeLinecap="round"
+              strokeDasharray={314} strokeDashoffset={314 * (1 - progress)}
+              style={{ transition:"stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1)", filter:"drop-shadow(0 0 8px #34d399)" }} />
+            {/* Target marker */}
+            <circle cx={140 + 100 * Math.cos(Math.PI - Math.PI * targetProgress)} cy={150 - 100 * Math.sin(Math.PI - Math.PI * targetProgress)}
+              r={6} fill="#a78bfa" stroke="white" strokeWidth={2}
+              style={{ filter:"drop-shadow(0 0 6px #a78bfa)" }} />
+          </svg>
+          {/* Score display */}
+          <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-30%)", textAlign:"center" }}>
+            <div style={{ fontSize:54, fontWeight:800, fontFamily:"'JetBrains Mono', monospace", background:"linear-gradient(135deg,#fbbf24,#34d399)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", lineHeight:1 }}>
+              {currentScore}
+            </div>
+            <div style={{ fontSize:11, color:"rgba(226,234,255,0.4)", marginTop:4, textTransform:"uppercase", letterSpacing:"0.1em" }}>
+              Target: {targetScore}
+            </div>
+          </div>
+        </div>
+
+        {/* Action items */}
+        <div style={{ flex:1, minWidth:220, display:"flex", flexDirection:"column", gap:12 }}>
+          <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>AI Recommendations</div>
+          {actions.map((a, i) => (
+            <div key={i} style={{
+              display:"flex", alignItems:"center", gap:12, padding:"12px 16px",
+              background:`${a.color}08`, border:`1px solid ${a.color}20`, borderLeft:`3px solid ${a.color}`,
+              borderRadius:12, animation:`fadeUp 0.4s ease ${i*0.1}s both`,
+            }}>
+              <div style={{ width:6, height:6, borderRadius:"50%", background:a.color, boxShadow:`0 0 6px ${a.color}`, flexShrink:0 }} />
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:600, marginBottom:2 }}>{a.task}</div>
+                <div style={{ fontSize:10, color:"rgba(226,234,255,0.35)", fontFamily:"'JetBrains Mono', monospace" }}>Impact: {a.impact}</div>
+              </div>
+              <div style={{ fontSize:10, padding:"4px 10px", borderRadius:20, background:`${a.color}20`, color:a.color, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em" }}>
+                {a.status === "done" ? "✓" : a.status === "in-progress" ? "⟳" : "○"}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Score timeline prediction */}
+      <div>
+        <div style={{ fontWeight:700, fontSize:14, marginBottom:16 }}>6-Month Projection</div>
+        <div style={{ display:"flex", gap:8, alignItems:"flex-end", height:140 }}>
+          {[720, 735, 752, 768, 784, 800].map((score, i) => (
+            <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+              <div style={{ fontSize:11, color:"rgba(226,234,255,0.5)", fontFamily:"'JetBrains Mono', monospace" }}>{score}</div>
+              <div style={{
+                width:"100%", height:Math.round((score-700)/100*120), background:"linear-gradient(to top, #fbbf24, #34d399)",
+                borderRadius:"4px 4px 0 0", filter:"drop-shadow(0 0 4px #34d399)",
+                animation:`fadeUp 0.6s ease ${i*0.15}s both`,
+              }} />
+              <div style={{ fontSize:10, color:"rgba(226,234,255,0.3)" }}>M{i+1}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SHELL ─────────────────────────────────────────────────────
+function Shell({ token, initialBankerToken = "" }) {
+  const [user, setUser] = useState(null);
+  const [updates, setUpdates] = useState(fallbackUpdates);
+  const [bankerToken, setBankerToken] = useState(initialBankerToken);
   const [customerProfile, setCustomerProfile] = useState({
-    name: "Arjun Sharma",
+    customerId: "CUST-7721",
+    name: "", // Will be set from logged-in user or input
+    phone: "9876543210",
     income: 92000,
     spending: 51000,
     loans: 24000,
     creditScore: 734,
-    riskLevel: "medium"
+    riskLevel: "medium",
   });
-  const [col, setCol] = useState(false);
-  const [introDone, setIntroDone] = useState(false);
-  const [authView, setAuthView] = useState("login");
+  const [loading, setL] = useState(true);
+  const [active, setA]  = useState("home");
+  const [col, setCol]   = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [welcomePlayed, setWelcomePlayed] = useState(false);
   const mobile = useIsMobile();
 
-  useEffect(() => {
-    // Check for existing session
-    const saved = localStorage.getItem("fp_token");
-    const savedBanker = localStorage.getItem("fp_banker_token");
-    
-    if (saved) {
-      setToken(saved);
-      if (savedBanker) setBankerToken(savedBanker);
-      setIntroDone(true); // Skip intro if already logged in
-      loadInitialData();
+  // Welcome voice message
+  const playWelcomeMessage = () => {
+    if ('speechSynthesis' in window && !welcomePlayed && customerProfile?.name) {
+      const userName = customerProfile.name || 'User';
+      const utterance = new SpeechSynthesisUtterance(`Welcome back to FinPilot AI, ${userName}. Your intelligent financial co-pilot is ready to assist you.`);
+      utterance.pitch = 1.0;
+      utterance.rate = 0.9;
+      utterance.volume = 0.8;
+      utterance.lang = 'en-US';
+      speechSynthesis.speak(utterance);
+      setWelcomePlayed(true);
     }
+  };
+
+  useEffect(() => {
+    Promise.all([api.getProfile(token), api.getUpdates()])
+      .then(([profile, feed]) => {
+        setUser(profile);
+        setUpdates(feed);
+        // Update customer profile with logged-in user's name
+        setCustomerProfile(prev => ({ ...prev, name: profile.name }));
+        // Play welcome message after user data is loaded
+        setTimeout(() => {
+          setCustomerProfile(prev => ({ ...prev, name: profile.name }));
+          playWelcomeMessage();
+        }, 1000);
+      })
+      .finally(() => setL(false));
+  }, [token]);
+
+  useEffect(() => {
+    const id = setInterval(async () => {
+      const live = await api.getUpdates();
+      setUpdates(live);
+    }, 60000);
+    return () => clearInterval(id);
   }, []);
 
-  const loadInitialData = async () => {
-    if (!token) return;
-    const [profileData, updatesData, modulesData] = await Promise.all([
-      api.getProfile(token),
-      api.getUpdates(),
-      api.getFeatureModules(),
-    ]);
-    setProfile(profileData);
-    setUpdates(updatesData);
-    setFeatureModules(modulesData);
-  };
+  if (loading) return (
+    <div style={{ position:"fixed", inset:0, background:"#030712", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:20 }}>
+      <Starfield />
+      <div style={{ position:"relative", zIndex:1 }}>
+        <AstroSphere size={mobile ? 110 : 140} color1="#1a3a8e" color2="#0d1f6e" glowColor="#63b3ff" animate />
+      </div>
+      <div style={{ position:"relative", zIndex:1, fontFamily:"'JetBrains Mono', monospace", fontSize:11, color:"rgba(99,179,255,0.5)", letterSpacing:"0.2em", animation:"blink 1.5s ease-in-out infinite" }}>LOADING…</div>
+    </div>
+  );
 
-  const renderPage = () => {
-    switch (page) {
-      case "home": return <Home user={profile} updates={updates} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />;
-      case "astrofin": return <AstroFin updates={updates} customerProfile={customerProfile} />;
-      case "creditai": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>AI Credit Score Improver</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
-      case "crosssell": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>Intelligent Cross-Sell Engine</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
-      case "rmcopilot": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>Banker / RM Co-Pilot</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
-      case "compliance": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>Privacy & Compliance Layer</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
-      case "loan": return <Loan />;
-      case "fraud": return <Fraud />;
-      case "ai": return <AskAstro updates={updates} customerProfile={customerProfile} />;
-      case "analytics": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>Analytics</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
-      case "settings": return <div style={{ padding: 32, animation: "fadeIn 0.4s ease" }}><div style={{ fontSize: 28, fontWeight: 800 }}>Settings</div><div style={{ marginTop: 16, color: "rgba(226,234,255,0.6)" }}>Coming soon...</div></div>;
-      default: return <Home user={profile} updates={updates} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />;
-    }
+  const pages = {
+    home: <Home user={user} updates={updates} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />,
+    astrofin: <AstroFin updates={updates} customerProfile={customerProfile} />,
+    creditai: <CreditScore user={user} />,
+    crosssell: <CrossSellEngine token={token} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />,
+    rmcopilot: <RMCopilot token={token} bankerToken={bankerToken} setBankerToken={setBankerToken} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />,
+    compliance: <ComplianceLayer token={token} bankerToken={bankerToken} />,
+    loan: <Loan />,
+    fraud: <Fraud />,
+    ai: <AskAstro updates={updates} customerProfile={customerProfile} />,
+    analytics: <Analytics updates={updates} />,
+    settings: <Settings user={user} />,
   };
-
-  if (!introDone) return <Intro onDone={() => setIntroDone(true)} />;
-  if (!token) return authView === "login" ? <Login onSuccess={(data) => { 
-    setToken(data.token); 
-    setBankerToken(data.bankerToken); 
-    localStorage.setItem("fp_token", data.token);
-    localStorage.setItem("fp_banker_token", data.bankerToken);
-    loadInitialData();
-  }} goSignup={() => setAuthView("signup")} /> : <Signup goLogin={() => setAuthView("login")} />;
 
   return (
-    <>
-      <Styles />
+    <div style={{ display:"flex", height:"100vh", position:"fixed", inset:0 }}>
       <Starfield />
-      <div style={{ display: "flex", height: "100vh", position: "relative", zIndex: 1 }}>
-        {/* Mobile menu overlay */}
-        {mobile && mobileMenuOpen && (
-          <div style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.8)",
-            zIndex: 20,
-            display: "flex",
-            flexDirection: "column",
-            padding: 20,
-          }}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>FinPilot AI</div>
-              <button onClick={() => setMobileMenuOpen(false)} style={{ fontSize: 24, background: "none", border: "none", color: "#e2eaff", cursor: "pointer" }}>✕</button>
-            </div>
-            {NAV.map(n => (
-              <button key={n.id} onClick={() => { setPage(n.id); setMobileMenuOpen(false); }} style={{
-                display: "flex", alignItems: "center", gap: 12,
-                padding: "12px 16px", borderRadius: 12,
-                background: page === n.id ? "rgba(99,179,255,0.15)" : "transparent",
-                border: page === n.id ? "1px solid rgba(99,179,255,0.3)" : "1px solid transparent",
-                color: page === n.id ? "#e2eaff" : "rgba(226,234,255,0.6)",
-                fontSize: 14, fontWeight: 500,
-                cursor: "pointer", transition: "all 0.2s",
-              }}>
-                <span style={{ fontSize: 16 }}>{n.icon}</span>
-                <span>{n.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        
-        <Sidebar active={page} setActive={setPage} col={col} setCol={setCol} user={profile} />
-        
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <TopBar active={page} user={profile} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
-          <div className="page-content" style={{ flex: 1, overflowY: "auto", padding: mobile ? 16 : 32 }}>
-            {renderPage()}
-          </div>
+      {/* Desktop sidebar */}
+      <div className="desktop-sidebar" style={{ flexDirection:"column" }}>
+        <Sidebar active={active} setActive={setA} col={col} setCol={setCol} user={user} />
+      </div>
+      <div style={{ flex:1, display:"flex", flexDirection:"column", position:"relative", zIndex:1, overflow:"hidden" }}>
+        <TopBar active={active} user={user} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
+        <div className="page-content" style={{ flex:1, overflowY:"auto", padding: mobile ? "16px 16px 90px" : "32px 40px" }}>
+          {pages[active]}
+          <InvestorsShowcase featureId={active} title="Investors & Mentors" />
         </div>
       </div>
-    </>
+      {/* Mobile sidebar */}
+      {mobile && (
+        <div style={{
+          position:"fixed",
+          top:0,
+          left:0,
+          width:"100vw",
+          height:"100vh",
+          background:"rgba(3,7,18,0.95)",
+          zIndex:20,
+          display: mobileMenuOpen ? "block" : "none"
+        }}>
+          <div style={{
+            position:"absolute",
+            top:0,
+            left:0,
+            width:"292px",
+            height:"100vh",
+            background:"rgba(3,7,18,0.85)",
+            borderRight:"1px solid rgba(255,255,255,0.1)",
+            transform: mobileMenuOpen ? "translateX(0)" : "translateX(-100%)",
+            transition:"transform 0.3s ease"
+          }}>
+            <Sidebar active={active} setActive={setA} col={col} setCol={setCol} user={user} />
+          </div>
+          <div 
+            style={{
+              position:"absolute",
+              top:0,
+              left:0,
+              width:"100vw",
+              height:"100vh",
+              background:"transparent"
+            }}
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        </div>
+      )}
+      {/* Mobile bottom nav */}
+      <BottomNav active={active} setActive={setA} />
+    </div>
   );
 }
 
-export default App;
+// ── ROOT ──────────────────────────────────────────────────────
+export default function App() {
+  const [phase, setPhase] = useState("intro");
+  const [token, setToken] = useState(null);
+  const [bankerToken, setBankerToken] = useState("");
+  return (
+    <>
+      <Styles />
+      {phase==="intro"  && <Intro  onDone={()=>setPhase("login")} />}
+      {phase==="login"  && <Login  onSuccess={({ token: t, bankerToken: bt })=>{setToken(t); setBankerToken(bt || ""); setPhase("app");}} goSignup={()=>setPhase("signup")} />}
+      {phase==="signup" && <Signup goLogin={()=>setPhase("login")} />}
+      {phase==="app"    && <Shell  token={token} initialBankerToken={bankerToken} />}
+    </>
+  );
+}

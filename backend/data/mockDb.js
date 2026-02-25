@@ -35,6 +35,27 @@ export const updatesFeed = {
   ],
 };
 
+export function getLiveUpdatesFeed() {
+  const now = Date.now();
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const since = [Math.round((now % (3 * hour)) / hour) + 1, Math.round((now % (5 * hour)) / hour) + 2, Math.round((now % (7 * hour)) / hour) + 3];
+  const shift = ((Math.sin(now / (10 * minute)) + 1) / 2) * 0.9 - 0.45;
+
+  const stockAlerts = updatesFeed.stockAlerts.map((s, i) => {
+    const delta = Number((shift + (i - 1) * 0.18).toFixed(2));
+    const change = Number((s.change + delta).toFixed(2));
+    const color = change >= 0 ? "#34d399" : "#f87171";
+    return { ...s, change, color };
+  });
+
+  return {
+    ...updatesFeed,
+    latestFinance: updatesFeed.latestFinance.map((x, i) => ({ ...x, time: `${since[i]}h ago` })),
+    stockAlerts,
+  };
+}
+
 export const featureModules = {
   crossSell: {
     id: "crossSell",

@@ -1,11 +1,21 @@
 import { getBody } from "./_lib/body.js";
-import { fallbackReply, featureModules, mockUser, updatesFeed } from "./_lib/data.js";
+import { fallbackReply, featureModules, getLiveUpdatesFeed, mockUser } from "./_lib/data.js";
 import { buildCustomerProfile, recommendProducts, rmDecision } from "./_lib/featureEngine.js";
 import { generateAssistantReply } from "./_lib/llm.js";
-import { getAuditLogs, issueToken, maskValue, requireAuth, writeAudit } from "./_lib/security.js";
+import { getAuditLogs, getTokenFromReq, issueToken, maskValue, requireAuth, verifyToken, writeAudit } from "./_lib/security.js";
 
 function methodNotAllowed(res) {
   return res.status(405).json({ message: "Method not allowed" });
+}
+
+function nameFromEmail(email = "") {
+  const base = `${email}`.split("@")[0].replace(/[._-]+/g, " ").trim();
+  if (!base) return "FinPilot User";
+  return base
+    .split(" ")
+    .filter(Boolean)
+    .map((x) => x.charAt(0).toUpperCase() + x.slice(1))
+    .join(" ");
 }
 
 export default async function handler(req, res) {
@@ -47,7 +57,14 @@ export default async function handler(req, res) {
 
   if (path === "/api/auth/profile") {
     if (req.method !== "GET") return methodNotAllowed(res);
-    return res.status(200).json(mockUser);
+    const token = getTokenFromReq(req);
+    const claims = verifyToken(token);
+    const email = claims?.email || mockUser.email;
+    return res.status(200).json({
+      ...mockUser,
+      email,
+      name: nameFromEmail(email),
+    });
   }
 
   if (path === "/api/auth/banker-token") {
@@ -63,7 +80,16 @@ export default async function handler(req, res) {
     const message = `${body?.message || ""}`;
     const language = `${body?.language || "en"}`;
     const langLabel = language === "mr" ? "Marathi" : language === "hi" ? "Hindi" : "English";
-    const prompt = `User question (${langLabel}): ${message}\nContext: FinPilot personal finance assistant. Analyse briefly and respond in ${langLabel} with 3–5 bullet points plus a 1‑line summary, focusing on practical, RBI‑minded guidance. Avoid repeating the same generic sentence.`;
+    const profile = body?.profile || {};
+    const prompt = `User question (${langLabel}): ${message}
+Customer context:
+- name: ${profile?.name || "Unknown"}
+- income: ${profile?.income || "n/a"}
+- spending: ${profile?.spending || "n/a"}
+- loans: ${profile?.loans || "n/a"}
+- creditScore: ${profile?.creditScore || "n/a"}
+- riskLevel: ${profile?.riskLevel || "n/a"}
+Instructions: Analyse loans, overall financial health, and provide a tailored investment/debt strategy when relevant. Respond in ${langLabel}. Do not repeat canned lines.`;
     const generated = await generateAssistantReply(prompt);
     const reply = generated.reply || fallbackReply(message);
     return res.status(200).json({ reply, provider: generated.provider || "local" });
@@ -74,7 +100,12 @@ export default async function handler(req, res) {
     if (req.method !== "POST") return methodNotAllowed(res);
     const body = getBody(req);
     const transcript = `${body?.transcript || ""}`;
-    const prompt = `User asked by voice: ${transcript}\nReply in 1-2 short sentences with practical fintech guidance.`;
+    const profile = body?.profile || {};
+    const language = `${body?.language || "en"}`;
+    const langLabel = language === "mr" ? "Marathi" : language === "hi" ? "Hindi" : "English";
+    const prompt = `User asked by voice (${langLabel}): ${transcript}
+Customer context: income ${profile?.income || "n/a"}, spending ${profile?.spending || "n/a"}, loans ${profile?.loans || "n/a"}, creditScore ${profile?.creditScore || "n/a"}.
+Reply quickly in ${langLabel} with direct action-oriented guidance.`;
     const generated = await generateAssistantReply(prompt);
     const reply = generated.reply || fallbackReply(transcript);
     return res.status(200).json({ transcript, reply, provider: generated.provider || "local" });
@@ -220,7 +251,7 @@ export default async function handler(req, res) {
   // Updates feed
   if (path === "/api/updates") {
     if (req.method !== "GET") return methodNotAllowed(res);
-    return res.status(200).json(updatesFeed);
+    return res.status(200).json(getLiveUpdatesFeed());
   }
 
   return res.status(404).json({ message: "Not found" });
