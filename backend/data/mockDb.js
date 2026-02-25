@@ -122,19 +122,20 @@ export const featureModules = {
   },
 };
 
-export function buildAstroReply(message = "") {
+export function buildAstroReply(message = "", profile = {}) {
   const q = message.toLowerCase();
-  if (q.includes("loan") || q.includes("emi")) {
-    return "Given your current cash flow, keep EMI under 35% of monthly surplus and prefer shorter tenures when rates are stable.";
+  const income = Number(profile?.income || 0);
+  const spending = Number(profile?.spending || 0);
+  const loans = Number(profile?.loans || 0);
+  const creditScore = Number(profile?.creditScore || 0);
+  const savings = Math.max(0, income - spending);
+  if (q.includes("financial health") || q.includes("health")) {
+    const emiRatio = income ? Math.round((loans / income) * 100) : 0;
+    return `Financial health snapshot: income ₹${income.toLocaleString("en-IN")}, savings ₹${savings.toLocaleString("en-IN")}, EMI ratio ${emiRatio}%, credit ${creditScore}. Prioritise debt cleanup and stable monthly investing.`;
   }
-  if (q.includes("credit") || q.includes("score")) {
-    return "Credit improvement path: keep utilization below 30%, pay before due date, and avoid clustered hard inquiries this quarter.";
-  }
-  if (q.includes("fraud") || q.includes("alert")) {
-    return "Highest current risk signal is unusual-device activity. Keep transaction limits and real-time push alerts enabled.";
-  }
-  if (q.includes("stock") || q.includes("market")) {
-    return "Market breadth is positive but narrow. Consider staggered entries instead of single large exposure.";
-  }
-  return "Signals are mixed but constructive. Maintain diversified positions and review debt-to-income monthly for stability.";
+  if (q.includes("loan") || q.includes("emi")) return "Keep EMI burden under control, avoid overlapping loans, and prepay expensive debt first.";
+  if (q.includes("credit") || q.includes("score")) return "To improve score, keep utilisation lower, avoid missed payments, and reduce fresh inquiries.";
+  if (q.includes("fraud") || q.includes("alert")) return "Enable transaction alerts, lock card limits, and treat OTP/PIN requests as high-risk.";
+  if (q.includes("stock") || q.includes("market") || q.includes("invest")) return "Use staggered investing and diversify across goals rather than concentrated bets.";
+  return "Share your exact cash flow and goals and I will suggest a more precise plan.";
 }

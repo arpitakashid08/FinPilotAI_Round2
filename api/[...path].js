@@ -91,7 +91,7 @@ Customer context:
 - riskLevel: ${profile?.riskLevel || "n/a"}
 Instructions: Analyse loans, overall financial health, and provide a tailored investment/debt strategy when relevant. Respond in ${langLabel}. Do not repeat canned lines.`;
     const generated = await generateAssistantReply(prompt);
-    const reply = generated.reply || fallbackReply(message);
+    const reply = generated.reply || fallbackReply(message, profile, language);
     return res.status(200).json({ reply, provider: generated.provider || "local" });
   }
 
@@ -107,7 +107,7 @@ Instructions: Analyse loans, overall financial health, and provide a tailored in
 Customer context: income ${profile?.income || "n/a"}, spending ${profile?.spending || "n/a"}, loans ${profile?.loans || "n/a"}, creditScore ${profile?.creditScore || "n/a"}.
 Reply quickly in ${langLabel} with direct action-oriented guidance.`;
     const generated = await generateAssistantReply(prompt);
-    const reply = generated.reply || fallbackReply(transcript);
+    const reply = generated.reply || fallbackReply(transcript, profile, language);
     return res.status(200).json({ transcript, reply, provider: generated.provider || "local" });
   }
 

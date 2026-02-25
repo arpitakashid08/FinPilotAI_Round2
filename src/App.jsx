@@ -149,19 +149,26 @@ async function callApi(path, opts = {}, fallback) {
 
 function fallbackAstroReply(message = "") {
   const q = message.toLowerCase();
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const seed = tokens.reduce((acc, w) => acc + w.charCodeAt(0), 0) % 3;
+  const generic = [
+    "Start with a monthly cash-flow map: income, essentials, EMI outflow, and a fixed investment amount.",
+    "Use a 50/30/20 style framework and rebalance if EMIs are crowding savings capacity.",
+    "Prioritise expensive debt first, then increase SIPs gradually rather than making one large bet.",
+  ];
   if (q.includes("sip") || q.includes("mutual") || q.includes("invest") || q.includes("portfolio")) {
-    return "For investments, split money into (1) emergency fund in liquid/FD, (2) 2–3 diversified equity index or large-cap funds via SIP, and (3) debt for near-term goals. Match horizon to product and avoid overlapping, high-cost schemes.";
+    return `${generic[seed]} Keep near-term goals in low-volatility instruments and long-term goals in diversified equity funds.`;
   }
   if (q.includes("loan") || q.includes("emi") || q.includes("interest") || q.includes("personal loan")) {
-    return "Keep all EMIs under ~40% of monthly income, prioritise closing high-interest personal/credit-card loans first, and avoid top-ups if utilisation or credit score is already stressed. Use surplus cash to pre-pay expensive debt before starting aggressive investments.";
+    return `${generic[seed]} Keep EMI load below a safe threshold and prepay high-interest debt whenever surplus appears.`;
   }
   if (q.includes("credit score") || q.includes("cibil") || q.includes("score")) {
-    return "To improve credit score, avoid late payments, keep utilisation below ~30%, do not open/close many cards at once, and maintain a long, clean repayment track record. Even small on-time EMIs over 6–12 months can move your score meaningfully.";
+    return `${generic[seed]} Improve score with on-time payments, low utilisation, and fewer hard inquiries for the next 2–3 months.`;
   }
   if (q.includes("fraud") || q.includes("scam") || q.includes("upi") || q.includes("otp")) {
-    return "Treat unknown payment links, OTP requests, and remote-access apps as red flags. Never share OTPs or PINs, lock limits on rarely used channels, and enable strong device + SIM security so suspicious transactions can be blocked quickly.";
+    return `${generic[seed]} Never share OTP/PIN, lock card limits, and enable instant debit alerts on all critical accounts.`;
   }
-  return "Think in terms of cash flow: map income, essential spends, EMIs, and goals, then automate savings on salary day into 2–3 labelled buckets. This makes it easier to stay under a safe EMI limit, fund near-term goals, and still invest long term without surprises.";
+  return `${generic[seed]} If you share exact income, EMI, and goals, I can give a tighter plan.`;
 }
 
 function dynamicFallbackUpdates() {
@@ -944,9 +951,7 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
         <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, color:"rgba(99,179,255,0.5)", letterSpacing:"0.15em", marginBottom:8 }}>
           FINANCIAL OVERVIEW · <span style={{ animation:"blink 1.2s step-end infinite" }}>●</span> LIVE
         </div>
-        <div className="hero-name" style={{ fontSize:34, fontWeight:800, lineHeight:1.1 }}>
-          Welcome back, <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{user.name.split(" ")[0]}</span>
-        </div>
+        <div className="hero-name" style={{ fontSize:34, fontWeight:800, lineHeight:1.1 }}>Welcome back</div>
       </div>
 
       {/* Sphere + floating labels */}
@@ -1336,12 +1341,6 @@ function Loan() {
   const [months, setMon] = useState(24);
   const [rate, setRate]  = useState(9);
   const [res, setRes]    = useState(null);
-  const [insurances, setInsurances] = useState(["Health Shield - ₹1,200/mo"]);
-  const [licPolicies, setLicPolicies] = useState(["Jeevan Anand - ₹12,500/yr"]);
-  const [investments, setInvestments] = useState(["Index SIP - ₹5,000/mo"]);
-  const [newInsurance, setNewInsurance] = useState("");
-  const [newLic, setNewLic] = useState("");
-  const [newInvestment, setNewInvestment] = useState("");
   const [fxAmount, setFxAmount] = useState(100000);
   const [fxFrom, setFxFrom] = useState("INR");
   const [fxTo, setFxTo] = useState("USD");
@@ -1427,53 +1426,6 @@ function Loan() {
             </div>
           )}
         </div>
-      </div>
-      <div style={{ marginTop:24, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:12 }}>
-        {[
-          {
-            title: "Insurance Policies",
-            color: "#34d399",
-            items: insurances,
-            value: newInsurance,
-            onChange: setNewInsurance,
-            onAdd: () => { if (newInsurance.trim()) { setInsurances((x) => [...x, newInsurance.trim()]); setNewInsurance(""); } },
-          },
-          {
-            title: "LIC Policies",
-            color: "#fbbf24",
-            items: licPolicies,
-            value: newLic,
-            onChange: setNewLic,
-            onAdd: () => { if (newLic.trim()) { setLicPolicies((x) => [...x, newLic.trim()]); setNewLic(""); } },
-          },
-          {
-            title: "Investments",
-            color: "#a78bfa",
-            items: investments,
-            value: newInvestment,
-            onChange: setNewInvestment,
-            onAdd: () => { if (newInvestment.trim()) { setInvestments((x) => [...x, newInvestment.trim()]); setNewInvestment(""); } },
-          },
-        ].map((block) => (
-          <div key={block.title} style={{ clipPath:"polygon(6% 0,94% 0,100% 18%,100% 82%,94% 100%,6% 100%,0 82%,0 18%)", border:`1px solid ${block.color}55`, background:`${block.color}12`, padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
-            <div style={{ fontSize:12, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.12em", color:block.color }}>{block.title}</div>
-            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-              {block.items.map((item, idx) => (
-                <div key={`${block.title}-${idx}`} style={{ fontSize:12, color:"rgba(226,234,255,0.85)", lineHeight:1.45 }}>{item}</div>
-              ))}
-            </div>
-            <div style={{ display:"flex", gap:8 }}>
-              <input
-                value={block.value}
-                onChange={(e) => block.onChange(e.target.value)}
-                placeholder={`Add ${block.title.toLowerCase()}`}
-                className="glass-input"
-                style={{ flex:1, padding:"9px 11px", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.18)", borderRadius:10, color:"#e2eaff", fontSize:12 }}
-              />
-              <button onClick={block.onAdd} style={{ clipPath:"polygon(12% 0,100% 0,88% 100%,0 100%)", border:`1px solid ${block.color}80`, background:`${block.color}26`, color:"#e2eaff", padding:"8px 12px", fontSize:11, fontWeight:700 }}>Add</button>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -1712,7 +1664,7 @@ function AskAstro({ updates, customerProfile }) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
-  const [recognition, setRecognition] = useState(null);
+  const recognitionRef = useRef(null);
   const uiCopy = {
     en: { ask: "Ask Astro", sub: "// conversational AI — powered by your financial twin", language: "Language", startVoice: "Start Voice", stop: "Stop", speak: "Speak Response", speaking: "Speaking...", ready: "Voice Ready", listening: "Listening..." },
     hi: { ask: "पूछें Astro", sub: "// संवादात्मक AI — आपके वित्तीय ट्विन पर आधारित", language: "भाषा", startVoice: "आवाज़ शुरू", stop: "रोकें", speak: "उत्तर सुनें", speaking: "बोल रहा है...", ready: "आवाज़ तैयार", listening: "सुन रहा है..." },
@@ -1722,48 +1674,43 @@ function AskAstro({ updates, customerProfile }) {
   
   // Check browser support for voice features
   useEffect(() => {
-    const speechSupported = 'speechSynthesis' in window;
-    const recognitionSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+    const speechSupported = "speechSynthesis" in window;
+    const recognitionSupported = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
     setVoiceSupported(speechSupported && recognitionSupported);
-    
-    if (recognitionSupported) {
-      const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-      const recognitionInstance = new SpeechRecognition();
-      recognitionInstance.continuous = false;
-      recognitionInstance.interimResults = false;
-      recognitionInstance.lang = lang === 'mr' ? 'mr-IN' : lang === 'hi' ? 'hi-IN' : 'en-US';
-      
-      recognitionInstance.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(transcript);
+    if (!recognitionSupported) return;
+
+    const SR = window.webkitSpeechRecognition || window.SpeechRecognition;
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    rec.lang = lang === "mr" ? "mr-IN" : lang === "hi" ? "hi-IN" : "en-US";
+
+    rec.onresult = (event) => {
+      let finalText = "";
+      let interimText = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const piece = event.results[i]?.[0]?.transcript || "";
+        if (event.results[i].isFinal) finalText += piece;
+        else interimText += piece;
+      }
+      const composed = (finalText || interimText).trim();
+      if (composed) setInput(composed);
+      if (finalText.trim()) {
         setIsListening(false);
-        
-        // Auto-send the voice input
-        if (transcript.trim()) {
-          setTimeout(() => {
-            const inputElement = document.querySelector('.glass-input');
-            if (inputElement) {
-              inputElement.value = transcript;
-              setInput(transcript);
-              // Trigger send function
-              handleVoiceSend(transcript);
-            }
-          }, 500);
-        }
-      };
-      
-      recognitionInstance.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-      };
-      
-      recognitionInstance.onend = () => {
-        setIsListening(false);
-      };
-      
-      setRecognition(recognitionInstance);
-    }
-  }, [lang]);
+        handleVoiceSend(finalText.trim());
+      }
+    };
+
+    rec.onerror = () => setIsListening(false);
+    rec.onend = () => setIsListening(false);
+    recognitionRef.current = rec;
+
+    return () => {
+      try { rec.abort(); } catch {}
+      recognitionRef.current = null;
+    };
+  }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Handle voice input sending
   const handleVoiceSend = async (voiceText) => {
@@ -1809,17 +1756,18 @@ function AskAstro({ updates, customerProfile }) {
   
   // Start voice recognition
   const startListening = () => {
-    if (!recognition || isListening) return;
-    
+    const rec = recognitionRef.current;
+    if (!rec || isListening) return;
+    setInput("");
     setIsListening(true);
-    recognition.start();
+    try { rec.start(); } catch { setIsListening(false); }
   };
   
   // Stop voice recognition
   const stopListening = () => {
-    if (!recognition || !isListening) return;
-    
-    recognition.stop();
+    const rec = recognitionRef.current;
+    if (!rec || !isListening) return;
+    try { rec.stop(); } catch {}
     setIsListening(false);
   };
   

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { generateAssistantReply } from "../services/llm.js";
+import { buildAstroReply } from "../data/mockDb.js";
 
 const router = Router();
 
@@ -16,6 +17,8 @@ Reply in ${langLabel} with concise and practical fintech guidance.`;
   const generated = await generateAssistantReply(prompt);
   if (generated.reply) {
     reply = generated.reply;
+  } else if (profile && Object.keys(profile).length > 0) {
+    reply = buildAstroReply(transcript, profile);
   } else if (transcript.includes("tesla") || transcript.includes("musk")) {
     reply = "Tesla signal: medium volatility, positive momentum, maintain staggered position sizing.";
   } else if (transcript.includes("microsoft") || transcript.includes("nadella")) {

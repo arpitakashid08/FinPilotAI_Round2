@@ -13,7 +13,7 @@ router.post("/ai/chat", async (req, res) => {
 Customer context: name ${profile?.name || "Unknown"}, income ${profile?.income || "n/a"}, spending ${profile?.spending || "n/a"}, loans ${profile?.loans || "n/a"}, creditScore ${profile?.creditScore || "n/a"}, riskLevel ${profile?.riskLevel || "n/a"}.
 Give tailored financial-health guidance and investment/debt strategy when relevant. Respond in ${langLabel}.`;
   const generated = await generateAssistantReply(prompt);
-  const reply = generated.reply || buildAstroReply(message);
+  const reply = generated.reply || buildAstroReply(message, profile);
   return res.json({ reply, provider: generated.provider || "local" });
 });
 

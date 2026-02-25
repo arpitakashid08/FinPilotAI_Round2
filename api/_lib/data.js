@@ -116,11 +116,30 @@ export const featureModules = {
   },
 };
 
-export function fallbackReply(message = "") {
+export function fallbackReply(message = "", profile = {}, language = "en") {
   const q = message.toLowerCase();
-  if (q.includes("loan") || q.includes("emi")) return "Given your cash flow, keep EMI under 35% of monthly surplus and prefer shorter tenures when rates are stable.";
-  if (q.includes("credit") || q.includes("score")) return "Keep utilization below 30%, pay before due date, and avoid clustered hard inquiries this quarter.";
-  if (q.includes("fraud") || q.includes("alert")) return "Highest risk signal is unusual-device activity. Keep transaction limits and push alerts enabled.";
-  if (q.includes("stock") || q.includes("market")) return "Market breadth is positive but narrow. Prefer staggered entries over concentrated buying.";
-  return "Signals are mixed but constructive. Maintain diversified positions and review debt-to-income monthly.";
+  const income = Number(profile?.income || 0);
+  const spending = Number(profile?.spending || 0);
+  const loans = Number(profile?.loans || 0);
+  const creditScore = Number(profile?.creditScore || 0);
+  const savings = Math.max(0, income - spending);
+  const emiRatio = income ? loans / income : 0;
+  const variants = [
+    "Use a monthly plan with clear limits for EMI, essentials, and investing.",
+    "Prioritise cash-flow stability first, then increase long-term investing step by step.",
+    "Keep a 3–6 month emergency cushion before taking additional market risk.",
+  ];
+  const seed = (q.length + (creditScore || 0)) % variants.length;
+  const pre = variants[seed];
+
+  if (q.includes("financial health") || q.includes("health")) {
+    return `${pre} Current snapshot: income ₹${income.toLocaleString("en-IN") || "0"}, savings ₹${savings.toLocaleString("en-IN") || "0"}, EMI ratio ${Math.round(emiRatio * 100)}%, credit ${creditScore || "n/a"}. Focus on reducing EMI ratio below 35% and keeping credit utilisation controlled.`;
+  }
+  if (q.includes("loan") || q.includes("emi")) return `${pre} Keep EMI ratio near or below 35%, and prepay highest-interest debt first.`;
+  if (q.includes("credit") || q.includes("score")) return `${pre} Improve score with on-time payments, low utilization, and fewer fresh hard inquiries.`;
+  if (q.includes("fraud") || q.includes("alert")) return `${pre} Enable real-time alerts, tighten transfer limits, and never share OTP/PIN.`;
+  if (q.includes("stock") || q.includes("market") || q.includes("invest")) return `${pre} Split by goal horizon and avoid concentrated entries in a single asset/theme.`;
+  if (language === "hi") return `${pre} अपने आय, खर्च और ईएमआई के आधार पर बताइए तो मैं और सटीक सलाह दूंगा।`;
+  if (language === "mr") return `${pre} तुमचे उत्पन्न, खर्च आणि EMI दिल्यास मी अधिक अचूक सल्ला देईन.`;
+  return `${pre} Share your exact income, EMI and goals, and I will give a sharper plan.`;
 }
