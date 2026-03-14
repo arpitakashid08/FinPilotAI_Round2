@@ -7,6 +7,8 @@ import updatesRoutes from "./routes/updates.js";
 import aiRoutes from "./routes/ai.js";
 import featuresRoutes from "./routes/features.js";
 import featureFlowsRoutes from "./routes/featureFlows.js";
+import upiRoutes from "./routes/upi.js";
+import pathfinderRoutes from "./routes/pathfinder.js";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -25,6 +27,8 @@ app.use("/api", updatesRoutes);
 app.use("/api", aiRoutes);
 app.use("/api", featuresRoutes);
 app.use("/api", featureFlowsRoutes);
+app.use("/api", upiRoutes);
+app.use("/api", pathfinderRoutes);
 
 app.listen(PORT, () => {
   console.log(`FinPilot backend listening on http://localhost:${PORT}`);

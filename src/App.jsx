@@ -229,6 +229,18 @@ const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ inputs, scenarios }),
     }, { insights: {}, provider: "local" }),
+  upiStatus: async () =>
+    callApi("/upi/status", {}, { connected: false, provider: "", vpa: "", balance: 0, lastSync: null }),
+  upiConnect: async ({ provider = "", vpa = "" } = {}) =>
+    callApi("/upi/connect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider, vpa }),
+    }, { connected: true, provider, vpa, balance: 45600, lastSync: new Date().toISOString() }),
+  upiRefresh: async () =>
+    callApi("/upi/refresh", { method: "POST" }, { connected: false, provider: "", vpa: "", balance: 0, lastSync: null }),
+  upiDisconnect: async () =>
+    callApi("/upi/disconnect", { method: "POST" }, { connected: false, provider: "", vpa: "", balance: 0, lastSync: new Date().toISOString() }),
   getBankerToken: async () =>
     callApi("/auth/banker-token", { method: "POST" }, { bankerToken: "demo-banker-token" }),
   crossSellRecommend: async ({ profile, token }) =>
@@ -861,7 +873,7 @@ function Sidebar({ active, setActive, col, setCol, user }) {
 }
 
 // ── PAGE HEADER ───────────────────────────────────────────────
-function TopBar({ active, user, mobileMenuOpen, setMobileMenuOpen }) {
+function TopBar({ active, user, mobileMenuOpen, setMobileMenuOpen, balancePill }) {
   const n = NAV.find(x => x.id === active);
   const mobile = useIsMobile();
   
@@ -904,6 +916,7 @@ function TopBar({ active, user, mobileMenuOpen, setMobileMenuOpen }) {
         <div className="topbar-date" style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, color:"rgba(226,234,255,0.2)" }}>
           {new Date().toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" })}
         </div>
+        {balancePill}
         <div style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 14px", background:"rgba(52,211,153,0.07)", border:"1px solid rgba(52,211,153,0.14)", borderRadius:20, fontSize:11, color:"#34d399", fontWeight:600 }}>
           <span style={{ width:5, height:5, borderRadius:"50%", background:"#34d399", boxShadow:"0 0 5px #34d399", display:"inline-block", animation:"orbPulse 2s ease-in-out infinite" }} />
           LIVE
@@ -924,9 +937,14 @@ function OrbitLabel({ value, label, color, x, y }) {
 }
 
 // ── HOME PAGE ─────────────────────────────────────────────────
-function Home({ user, updates, customerProfile, setCustomerProfile }) {
+function Home({ user, updates, customerProfile, setCustomerProfile, upi, onConnectUpi, onRefreshUpi, onDisconnectUpi }) {
   const [isEditingIncome, setIsEditingIncome] = useState(false);
   const [tempIncome, setTempIncome] = useState(customerProfile.income);
+  const [upiOpen, setUpiOpen] = useState(false);
+  const [upiProvider, setUpiProvider] = useState("GPay");
+  const [upiVpa, setUpiVpa] = useState("");
+  const [upiErr, setUpiErr] = useState("");
+  const [upiBusy, setUpiBusy] = useState(false);
   
   const metrics = [
     { value:`₹${customerProfile.income.toLocaleString("en-IN")}`,   label:"Income",    color:"#34d399", x:"60%", y:"12%" },
@@ -952,6 +970,11 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
     setTempIncome(customerProfile.income);
     setIsEditingIncome(false);
   };
+
+  const fmtINR = (n) => `₹${Math.round(Number(n || 0)).toLocaleString("en-IN")}`;
+  const connected = !!upi?.connected;
+  const balance = connected ? (upi?.balance || 0) : (user?.balance || 0);
+
   return (
     <div style={{ animation:"fadeIn 0.4s ease", display:"flex", flexDirection:"column", gap:36 }}>
       <div>
@@ -1077,6 +1100,84 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
                 </button>
               </div>
             )}
+
+            {/* UPI connect (requested: below Edit Income area) */}
+            <div style={{
+              marginTop:14,
+              padding:"12px 14px",
+              borderRadius:18,
+              border:"1px solid rgba(255,255,255,0.06)",
+              background:"rgba(255,255,255,0.02)",
+              display:"flex",
+              alignItems:"center",
+              justifyContent:"space-between",
+              gap:12,
+              flexWrap:"wrap",
+            }}>
+              <div>
+                <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:10, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(226,234,255,0.35)" }}>
+                  {connected ? `Linked UPI Balance · ${upi.provider}` : "Link UPI wallet (demo)"}
+                </div>
+                <div style={{ fontSize:20, fontWeight:900, fontFamily:"'JetBrains Mono', monospace", marginTop:6, color:"#e2eaff" }}>
+                  {fmtINR(balance)}
+                </div>
+                {connected && (
+                  <div style={{ marginTop:6, fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.42)" }}>
+                    {upi.vpa} · last sync {upi.lastSync ? new Date(upi.lastSync).toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" }) : "—"}
+                  </div>
+                )}
+              </div>
+              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                {!connected ? (
+                  <button
+                    onClick={() => { setUpiErr(""); setUpiOpen(true); }}
+                    style={{
+                      padding:"8px 12px",
+                      background:"linear-gradient(135deg,rgba(167,139,250,0.18),rgba(99,179,255,0.10))",
+                      border:"1px solid rgba(167,139,250,0.35)",
+                      borderRadius:10,
+                      color:"#e2eaff",
+                      fontSize:11,
+                      fontWeight:800,
+                      boxShadow:"0 0 16px rgba(167,139,250,0.12)",
+                    }}
+                  >
+                    Connect GPay/PhonePe →
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={async () => { if (upiBusy) return; setUpiBusy(true); await onRefreshUpi?.(); setUpiBusy(false); }}
+                      style={{
+                        padding:"8px 12px",
+                        background:"rgba(99,179,255,0.10)",
+                        border:"1px solid rgba(99,179,255,0.25)",
+                        borderRadius:10,
+                        color:"#63b3ff",
+                        fontSize:11,
+                        fontWeight:800,
+                      }}
+                    >
+                      {upiBusy ? "Refreshing…" : "Refresh"}
+                    </button>
+                    <button
+                      onClick={async () => { if (upiBusy) return; setUpiBusy(true); await onDisconnectUpi?.(); setUpiBusy(false); }}
+                      style={{
+                        padding:"8px 12px",
+                        background:"rgba(248,113,113,0.10)",
+                        border:"1px solid rgba(248,113,113,0.25)",
+                        borderRadius:10,
+                        color:"#f87171",
+                        fontSize:11,
+                        fontWeight:800,
+                      }}
+                    >
+                      Disconnect
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
           <div style={{ width:"100%", height:1, background:"rgba(255,255,255,0.05)" }} />
@@ -1102,6 +1203,104 @@ function Home({ user, updates, customerProfile, setCustomerProfile }) {
           ))}
         </div>
       </div>
+
+      {/* UPI Connect Modal (Demo) */}
+      {upiOpen && (
+        <div style={{
+          position:"fixed",
+          inset:0,
+          background:"rgba(3,7,18,0.72)",
+          backdropFilter:"blur(10px)",
+          zIndex:60,
+          display:"flex",
+          alignItems:"center",
+          justifyContent:"center",
+          padding:16,
+        }}
+          onClick={() => setUpiOpen(false)}
+        >
+          <div style={{
+            width:"min(520px, 96vw)",
+            borderRadius:26,
+            border:"1px solid rgba(255,255,255,0.08)",
+            background:"radial-gradient(120% 120% at 10% 20%, rgba(167,139,250,0.14), rgba(99,179,255,0.08) 40%, rgba(255,255,255,0.03) 100%)",
+            boxShadow:"0 0 34px rgba(99,179,255,0.10)",
+            padding:18,
+          }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:10 }}>
+              <div>
+                <div style={{ fontSize:16, fontWeight:900 }}>Connect UPI (Demo)</div>
+                <div style={{ marginTop:6, fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.42)" }}>
+                  // Real GPay/PhonePe don’t expose public balance APIs. This demo simulates linking; production uses Account Aggregator / bank APIs.
+                </div>
+              </div>
+              <button onClick={() => setUpiOpen(false)} style={{ color:"rgba(226,234,255,0.55)", fontSize:16, padding:6, borderRadius:10, border:"1px solid rgba(255,255,255,0.06)", background:"rgba(255,255,255,0.03)" }}>✕</button>
+            </div>
+
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginTop:14 }}>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.55)" }}>Provider</div>
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                  {["GPay", "PhonePe", "UPI"].map((p) => {
+                    const isA = upiProvider === p;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => setUpiProvider(p)}
+                        style={{
+                          padding:"8px 10px",
+                          borderRadius:999,
+                          border: `1px solid ${isA ? "rgba(99,179,255,0.45)" : "rgba(255,255,255,0.06)"}`,
+                          background: isA ? "rgba(99,179,255,0.14)" : "rgba(255,255,255,0.02)",
+                          color: isA ? "#e2eaff" : "rgba(226,234,255,0.6)",
+                          fontSize:11,
+                          fontWeight:800,
+                        }}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.55)", marginBottom:6 }}>UPI ID (VPA)</div>
+                <Input placeholder="name@bank" value={upiVpa} onChange={(e) => setUpiVpa(e.target.value)} icon="@" />
+              </div>
+            </div>
+
+            {!!upiErr && <div style={{ marginTop:10, color:"#f87171", fontSize:12 }}>{upiErr}</div>}
+
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:14 }}>
+              <Btn outline onClick={() => setUpiOpen(false)}>Cancel</Btn>
+              <Btn
+                onClick={async () => {
+                  setUpiErr("");
+                  const vpa = upiVpa.trim();
+                  if (!vpa || !vpa.includes("@")) {
+                    setUpiErr("Enter a valid UPI ID like name@bank.");
+                    return;
+                  }
+                  setUpiBusy(true);
+                  try {
+                    await onConnectUpi?.({ provider: upiProvider, vpa });
+                    setUpiOpen(false);
+                  } catch {
+                    setUpiErr("Could not connect right now. Please retry.");
+                  } finally {
+                    setUpiBusy(false);
+                  }
+                }}
+                loading={upiBusy}
+              >
+                Connect →
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
         <div style={{ fontSize:12, textTransform:"uppercase", letterSpacing:"0.12em", color:"rgba(226,234,255,0.4)" }}>Latest Finance Updates</div>
@@ -4450,6 +4649,7 @@ function Shell({ token, initialBankerToken = "" }) {
   const [user, setUser] = useState(null);
   const [updates, setUpdates] = useState(fallbackUpdates);
   const [bankerToken, setBankerToken] = useState(initialBankerToken);
+  const [upi, setUpi] = useState({ connected: false, provider: "", vpa: "", balance: 0, lastSync: null });
   const [customerProfile, setCustomerProfile] = useState({
     customerId: "CUST-7721",
     name: "", // Will be set from logged-in user or input
@@ -4457,6 +4657,7 @@ function Shell({ token, initialBankerToken = "" }) {
     income: 92000,
     spending: 51000,
     loans: 24000,
+    balance: fallbackProfile.balance,
     creditScore: 734,
     riskLevel: "medium",
   });
@@ -4494,12 +4695,17 @@ function Shell({ token, initialBankerToken = "" }) {
   };
 
   useEffect(() => {
-    Promise.all([api.getProfile(token), api.getUpdates()])
-      .then(([profile, feed]) => {
+    Promise.all([api.getProfile(token), api.getUpdates(), api.upiStatus()])
+      .then(([profile, feed, upiStatus]) => {
         setUser(profile);
         setUpdates(feed);
+        setUpi(upiStatus || { connected: false, provider: "", vpa: "", balance: 0, lastSync: null });
         // Update customer profile with logged-in user's name
-        setCustomerProfile(prev => ({ ...prev, name: profile.name }));
+        setCustomerProfile(prev => ({
+          ...prev,
+          name: profile.name,
+          balance: (upiStatus && upiStatus.connected) ? (upiStatus.balance || prev.balance) : (profile.balance || prev.balance),
+        }));
         // Play welcome message after user data is loaded
         setTimeout(() => {
           setCustomerProfile(prev => ({ ...prev, name: profile.name }));
@@ -4517,6 +4723,18 @@ function Shell({ token, initialBankerToken = "" }) {
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    if (!upi?.connected) return;
+    const id = setInterval(async () => {
+      const next = await api.upiRefresh();
+      if (next && next.connected) {
+        setUpi(next);
+        setCustomerProfile((p) => ({ ...p, balance: next.balance || p.balance }));
+      }
+    }, 45000);
+    return () => clearInterval(id);
+  }, [upi?.connected]);
+
   if (loading) return (
     <div style={{ position:"fixed", inset:0, background:"#030712", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:20 }}>
       <Starfield />
@@ -4527,8 +4745,43 @@ function Shell({ token, initialBankerToken = "" }) {
     </div>
   );
 
+  const connectUpi = async ({ provider, vpa }) => {
+    const next = await api.upiConnect({ provider, vpa });
+    setUpi(next);
+    if (next?.connected) setCustomerProfile((p) => ({ ...p, balance: next.balance || p.balance }));
+    return next;
+  };
+  const refreshUpi = async () => {
+    const next = await api.upiRefresh();
+    setUpi(next);
+    if (next?.connected) setCustomerProfile((p) => ({ ...p, balance: next.balance || p.balance }));
+    return next;
+  };
+  const disconnectUpi = async () => {
+    const next = await api.upiDisconnect();
+    setUpi(next);
+    setCustomerProfile((p) => ({ ...p, balance: user?.balance || p.balance }));
+    return next;
+  };
+
+  const fmtINR = (n) => `₹${Math.round(Number(n || 0)).toLocaleString("en-IN")}`;
+  const balanceForPill = upi?.connected ? upi.balance : user?.balance;
+  const balancePill = (balanceForPill != null) ? (
+    <div style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 12px", borderRadius:999, background:"rgba(99,179,255,0.06)", border:"1px solid rgba(99,179,255,0.14)" }}>
+      <span style={{ width:7, height:7, borderRadius:"50%", background: upi?.connected ? "#34d399" : "rgba(226,234,255,0.35)", boxShadow: upi?.connected ? "0 0 8px rgba(52,211,153,0.6)" : "none" }} />
+      <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, color:"rgba(226,234,255,0.75)", fontWeight:700 }}>
+        {fmtINR(balanceForPill)}
+      </span>
+      {upi?.connected && (
+        <span style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.35)" }}>
+          {upi.provider}
+        </span>
+      )}
+    </div>
+  ) : null;
+
   const pages = {
-    home: <Home user={user} updates={updates} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} />,
+    home: <Home user={user} updates={updates} customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} upi={upi} onConnectUpi={connectUpi} onRefreshUpi={refreshUpi} onDisconnectUpi={disconnectUpi} />,
     astrofin: <AstroFin updates={updates} customerProfile={customerProfile} />,
     creditai: <CreditScore user={user} />,
     crosssell: <CrossSellEngine customerProfile={customerProfile} setCustomerProfile={setCustomerProfile} engineConfig={engineConfig} complianceState={complianceState} addAudit={addAudit} />,
@@ -4550,7 +4803,7 @@ function Shell({ token, initialBankerToken = "" }) {
         <Sidebar active={active} setActive={setA} col={col} setCol={setCol} user={user} />
       </div>
       <div style={{ flex:1, display:"flex", flexDirection:"column", position:"relative", zIndex:1, overflow:"hidden" }}>
-        <TopBar active={active} user={user} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
+        <TopBar active={active} user={user} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} balancePill={balancePill} />
         <div className="page-content" style={{ flex:1, overflowY:"auto", padding: mobile ? "16px 16px 90px" : "32px 40px" }}>
           {pages[active]}
           <InvestorsShowcase featureId={active} title="Investors & Mentors" />

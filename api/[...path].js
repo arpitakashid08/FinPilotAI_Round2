@@ -30,6 +30,38 @@ function strictLanguageInstruction(language) {
   return "Respond in English.";
 }
 
+let upiState = {
+  connected: false,
+  provider: "",
+  vpa: "",
+  balance: 0,
+  lastSync: null,
+};
+
+function clamp(n, a, b) {
+  return Math.min(b, Math.max(a, n));
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function stableSeed(str = "") {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function jitterBalance(current, vpa) {
+  const seed = stableSeed(`${vpa}:${new Date().toISOString().slice(0, 16)}`);
+  const driftPct = ((seed % 81) - 40) / 10000; // -0.40%..+0.40%
+  const next = Math.round(current * (1 + driftPct));
+  return clamp(next, 0, 5_00_00_000);
+}
+
 function fmtINR(n = 0) {
   const v = Math.round(Number(n || 0));
   return `₹${v.toLocaleString("en-IN")}`;
@@ -56,6 +88,25 @@ function buildLocalPathfinderInsights(scenarios = []) {
     out[s.id] = parts.join(" ");
   }
   return out;
+}
+
+async function getDbModels() {
+  const { connectDB } = await import("../config/db.js");
+  await connectDB();
+  const [{ default: UserFinancialProfile }, { default: SimulationScenario }] = await Promise.all([
+    import("../models/UserFinancialProfile.js"),
+    import("../models/SimulationScenario.js"),
+  ]);
+  return { UserFinancialProfile, SimulationScenario };
+}
+
+function asRiskLabel(value) {
+  if (typeof value === "string") return value;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "medium";
+  if (n < 35) return "low";
+  if (n < 70) return "medium";
+  return "high";
 }
 
 export default async function handler(req, res) {
@@ -165,6 +216,101 @@ No markdown, no bullets, no extra lines.`;
     }
     const finalInsights = Object.keys(insights).length ? insights : buildLocalPathfinderInsights(scenarios);
     return res.status(200).json({ insights: finalInsights, provider: generated.provider || "local" });
+  }
+
+  // Pathfinder DB (future-ready)
+  if (path === "/api/pathfinder/profile") {
+    if (req.method !== "POST") return methodNotAllowed(res);
+    if (!process.env.MONGO_URI) return res.status(503).json({ message: "db_unavailable", detail: "MONGO_URI_missing" });
+    const body = getBody(req);
+    const userId = body?.userId || body?.email || body?.sub;
+    if (!userId) return res.status(400).json({ message: "userId_required" });
+    const { UserFinancialProfile } = await getDbModels();
+    const doc = await UserFinancialProfile.create({
+      userId,
+      age: Number(body?.age ?? 0),
+      monthlyIncome: Number(body?.monthlyIncome ?? 0),
+      monthlyExpenses: Number(body?.monthlyExpenses ?? 0),
+      currentSavings: Number(body?.currentSavings ?? 0),
+      investmentRate: Number(body?.investmentRate ?? 0),
+      salaryGrowthRate: Number(body?.salaryGrowthRate ?? body?.salaryGrowth ?? 0),
+      inflationRate: Number(body?.inflationRate ?? body?.inflation ?? 0),
+      riskTolerance: asRiskLabel(body?.riskTolerance),
+      goals: Array.isArray(body?.goals) ? body.goals.map(String) : [],
+    });
+    return res.status(200).json({ profileId: doc._id, createdAt: doc.createdAt });
+  }
+
+  if (path === "/api/pathfinder/simulate") {
+    if (req.method !== "POST") return methodNotAllowed(res);
+    if (!process.env.MONGO_URI) return res.status(503).json({ message: "db_unavailable", detail: "MONGO_URI_missing" });
+    const body = getBody(req);
+    const scenarioName = `${body?.scenarioName || ""}`.trim();
+    if (!scenarioName) return res.status(400).json({ message: "scenarioName_required" });
+    const { UserFinancialProfile, SimulationScenario } = await getDbModels();
+
+    let profileId = body?.profileId;
+    if (!profileId) {
+      const userId = body?.userId || body?.email || body?.sub;
+      if (!userId) return res.status(400).json({ message: "userId_or_profileId_required" });
+      const latest = await UserFinancialProfile.findOne({ userId }).sort({ createdAt: -1 }).lean();
+      if (!latest?._id) return res.status(404).json({ message: "profile_not_found" });
+      profileId = latest._id;
+    }
+
+    const doc = await SimulationScenario.create({
+      userId: profileId,
+      scenarioName,
+      projectedNetWorth: Number(body?.projectedNetWorth ?? 0),
+      yearlyProjection: Array.isArray(body?.yearlyProjection) ? body.yearlyProjection : [],
+      debtImpact: Number(body?.debtImpact ?? 0),
+      goalTimeline: Array.isArray(body?.goalTimeline) ? body.goalTimeline : [],
+    });
+    return res.status(200).json({ scenarioId: doc._id, createdAt: doc.createdAt });
+  }
+
+  if (path.startsWith("/api/pathfinder/results/")) {
+    if (req.method !== "GET") return methodNotAllowed(res);
+    if (!process.env.MONGO_URI) return res.status(503).json({ message: "db_unavailable", detail: "MONGO_URI_missing" });
+    const userId = decodeURIComponent(path.replace("/api/pathfinder/results/", "") || "").trim();
+    if (!userId) return res.status(400).json({ message: "userId_required" });
+    const { UserFinancialProfile, SimulationScenario } = await getDbModels();
+    const profile = await UserFinancialProfile.findOne({ userId }).sort({ createdAt: -1 }).lean();
+    if (!profile?._id) return res.status(404).json({ message: "profile_not_found" });
+    const scenarios = await SimulationScenario.find({ userId: profile._id }).sort({ createdAt: -1 }).lean();
+    return res.status(200).json({ profile, scenarios });
+  }
+
+  // UPI (demo)
+  if (path === "/api/upi/status") {
+    if (req.method !== "GET") return methodNotAllowed(res);
+    return res.status(200).json(upiState);
+  }
+
+  if (path === "/api/upi/connect") {
+    if (req.method !== "POST") return methodNotAllowed(res);
+    const body = getBody(req);
+    const provider = `${body?.provider || ""}`.trim();
+    const vpa = `${body?.vpa || ""}`.trim();
+    if (!provider) return res.status(400).json({ message: "provider_required" });
+    if (!vpa || !vpa.includes("@")) return res.status(400).json({ message: "vpa_invalid" });
+    const seed = stableSeed(`${provider}:${vpa}`);
+    const base = 12_000 + (seed % 2_50_000);
+    upiState = { connected: true, provider, vpa, balance: base, lastSync: nowIso() };
+    return res.status(200).json(upiState);
+  }
+
+  if (path === "/api/upi/refresh") {
+    if (req.method !== "POST") return methodNotAllowed(res);
+    if (!upiState.connected) return res.status(200).json(upiState);
+    upiState = { ...upiState, balance: jitterBalance(upiState.balance, upiState.vpa), lastSync: nowIso() };
+    return res.status(200).json(upiState);
+  }
+
+  if (path === "/api/upi/disconnect") {
+    if (req.method !== "POST") return methodNotAllowed(res);
+    upiState = { connected: false, provider: "", vpa: "", balance: 0, lastSync: nowIso() };
+    return res.status(200).json(upiState);
   }
 
   // Voice
