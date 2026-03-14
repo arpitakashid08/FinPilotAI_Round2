@@ -223,6 +223,12 @@ const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, language, profile }),
     }, { reply: fallbackAstroReply(message) }),
+  pathfinderExplain: async ({ inputs = {}, scenarios = [] } = {}) =>
+    callApi("/ai/pathfinder-explain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inputs, scenarios }),
+    }, { insights: {}, provider: "local" }),
   getBankerToken: async () =>
     callApi("/auth/banker-token", { method: "POST" }, { bankerToken: "demo-banker-token" }),
   crossSellRecommend: async ({ profile, token }) =>
@@ -773,6 +779,7 @@ const NAV = [
   { id:"loan",      icon:"↯", label:"Loan Simulator"    },
   { id:"fraud",     icon:"◉", label:"Fraud Alerts"      },
   { id:"ai",        icon:"✦", label:"Ask Astro"          },
+  { id:"pathfinder", icon:"⌬", label:"Pathfinder AI – Life Decision Simulator" },
   { id:"analytics", icon:"▲", label:"Analytics"         },
   { id:"settings",  icon:"⚙", label:"Settings"          },
 ];
@@ -2157,6 +2164,686 @@ function AskAstro({ updates, customerProfile }) {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── PATHFINDER AI (Life Decision Simulator) ───────────────────
+function PathfinderAI() {
+  const mobile = useIsMobile();
+
+  const nowYear = new Date().getFullYear();
+  const fmtINR = (n) => `₹${Math.round(Number(n || 0)).toLocaleString("en-IN")}`;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const safeNum = (v, d = 0) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : d;
+  };
+
+  const [inputs, setInputs] = useState(() => ({
+    age: 28,
+    retirementAge: 60,
+    monthlyIncome: 90000,
+    monthlyExpenses: 52000,
+    currentSavings: 450000,
+    investmentRate: 0.28, // fraction of income
+    salaryGrowth: 0.08, // annual
+    inflation: 0.06, // annual
+    riskTolerance: 55, // 0-100
+    emergencyFundMonths: 6,
+    goals: {
+      house: 4500000,
+      travel: 300000,
+      car: 900000,
+      retirement: 30000000,
+    },
+  }));
+
+  const [selectedPath, setSelectedPath] = useState("corporate");
+  const [aiState, setAiState] = useState({ loading: false, provider: "local", err: "", insights: {} });
+
+  const baseAnnualReturn = useMemo(() => {
+    // 6% (low) -> 14% (high)
+    const r = 0.06 + (clamp(inputs.riskTolerance, 0, 100) / 100) * 0.08;
+    return clamp(r, 0.02, 0.18);
+  }, [inputs.riskTolerance]);
+
+  const monthlyRateFromAnnual = (annual) => Math.pow(1 + annual, 1 / 12) - 1;
+
+  const computeEmi = (principal, annualRate, months) => {
+    const p = Math.max(0, principal);
+    const n = Math.max(1, Math.floor(months));
+    const r = Math.max(0, annualRate) / 12;
+    if (!r) return p / n;
+    const pow = Math.pow(1 + r, n);
+    return (p * r * pow) / (pow - 1);
+  };
+
+  const simulatePath = (cfg) => {
+    const startAge = clamp(safeNum(inputs.age, 28), 14, 75);
+    const retireAge = clamp(safeNum(inputs.retirementAge, 60), startAge + 1, 85);
+    const months = Math.max(12, Math.floor((retireAge - startAge) * 12));
+
+    const income0 = Math.max(0, safeNum(inputs.monthlyIncome, 0));
+    const expenses0 = Math.max(0, safeNum(inputs.monthlyExpenses, 0));
+    const invRate0 = clamp(safeNum(inputs.investmentRate, 0.2), 0, 0.9);
+    const salaryGrowth0 = clamp(safeNum(inputs.salaryGrowth, 0.08), 0, 0.25);
+    const inflation0 = clamp(safeNum(inputs.inflation, 0.06), 0, 0.18);
+    const efMonths = clamp(safeNum(inputs.emergencyFundMonths, 6), 1, 18);
+
+    const goalHouse0 = Math.max(0, safeNum(inputs.goals?.house, 0));
+    const goalTravel0 = Math.max(0, safeNum(inputs.goals?.travel, 0));
+    const goalCar0 = Math.max(0, safeNum(inputs.goals?.car, 0));
+    const retirementTarget0 = Math.max(0, safeNum(inputs.goals?.retirement, 0));
+
+    const annualReturn = clamp((baseAnnualReturn + (cfg.returnAdj || 0)), 0.02, 0.20);
+    const mRet = monthlyRateFromAnnual(annualReturn);
+
+    let cash = Math.max(0, safeNum(inputs.currentSavings, 0));
+    let invested = 0;
+    let assetsHouse = 0;
+    let assetsCar = 0;
+    let maxDebt = 0;
+    let totalInterestPaid = 0;
+
+    const debts = [];
+    const goals = { emergencyFund: null, house: null, travel: null, car: null };
+
+    const addDebt = ({ kind, principal, annualRate, termMonths }) => {
+      const emi = computeEmi(principal, annualRate, termMonths);
+      debts.push({ kind, principal, annualRate, termMonths, emi });
+    };
+
+    if (cfg.eduDebtPrincipal) {
+      addDebt({ kind: "education", principal: cfg.eduDebtPrincipal, annualRate: 0.11, termMonths: 8 * 12 });
+    }
+
+    const yearly = [];
+    const monthlyNetWorth = [];
+    const goalCfg = {
+      house: { down: 0.20, rate: 0.085, term: 20 * 12, assetGrowth: inflation0 + 0.01 },
+      car: { down: 0.15, rate: 0.105, term: 5 * 12, assetGrowth: -0.10 }, // depreciates
+    };
+
+    for (let m = 0; m <= months; m++) {
+      const yr = Math.floor(m / 12);
+      const age = startAge + m / 12;
+
+      const growth = Math.pow(1 + salaryGrowth0 + (cfg.growthAdj || 0), yr);
+      const baseIncome = income0 * (cfg.incomeMultiplier || 1) * growth;
+      let income = baseIncome;
+      if (cfg.studyMonths && m < cfg.studyMonths) income = 0;
+      if (cfg.studyMonths && m >= cfg.studyMonths) income = baseIncome * (cfg.postStudyIncomeMultiplier || 1);
+      if (cfg.shockMonths && m < cfg.shockMonths) income = baseIncome * (cfg.shockMultiplier || 1);
+
+      const expenses = expenses0 * (cfg.expenseMultiplier || 1) * Math.pow(1 + inflation0, yr);
+
+      // Asset drift
+      if (assetsHouse > 0) assetsHouse *= 1 + (goalCfg.house.assetGrowth / 12);
+      if (assetsCar > 0) assetsCar *= 1 + (goalCfg.car.assetGrowth / 12);
+
+      // Investment drift
+      invested *= 1 + mRet;
+
+      // Debt service
+      let debtPayment = 0;
+      let debtOutstanding = 0;
+      for (const d of debts) {
+        if (d.principal <= 0) continue;
+        const r = d.annualRate / 12;
+        const interest = d.principal * r;
+        const principalPay = Math.max(0, d.emi - interest);
+        totalInterestPaid += interest;
+        d.principal = Math.max(0, d.principal - principalPay);
+        debtPayment += d.emi;
+        debtOutstanding += d.principal;
+      }
+      maxDebt = Math.max(maxDebt, debtOutstanding);
+
+      // Cashflow
+      let surplus = income - expenses - debtPayment;
+
+      const drawDown = (amt) => {
+        let left = Math.max(0, amt);
+        const c = Math.min(cash, left);
+        cash -= c;
+        left -= c;
+        const i = Math.min(invested, left);
+        invested -= i;
+        left -= i;
+        return left;
+      };
+
+      const addFunds = (amt) => {
+        cash += Math.max(0, amt);
+      };
+
+      if (surplus < 0) {
+        const unmet = drawDown(Math.abs(surplus));
+        // If still unmet, treat as compounding shortfall (worst-case) by adding debt
+        if (unmet > 1) {
+          addDebt({ kind: "cashflow", principal: unmet, annualRate: 0.18, termMonths: 24 });
+        }
+        surplus = 0;
+      }
+
+      // Emergency fund first
+      const efTarget = expenses * efMonths;
+      if (!goals.emergencyFund && cash < efTarget) {
+        const toEf = Math.min(surplus, efTarget - cash);
+        addFunds(toEf);
+        surplus -= toEf;
+        if (cash >= efTarget - 1) goals.emergencyFund = { age, year: nowYear + yr };
+      }
+
+      // Invest vs save
+      const desiredInv = income * clamp(invRate0 * (cfg.investRateMultiplier || 1), 0, 0.85);
+      const inv = Math.min(surplus, desiredInv);
+      invested += inv;
+      surplus -= inv;
+      addFunds(surplus);
+
+      const netWorth = cash + invested + assetsHouse + assetsCar - debtOutstanding;
+      monthlyNetWorth.push({ age, netWorth });
+
+      // Goals (inflated)
+      const infl = Math.pow(1 + inflation0, yr);
+      const houseCost = goalHouse0 * infl;
+      const travelCost = goalTravel0 * infl;
+      const carCost = goalCar0 * infl;
+
+      const canSpend = (amt) => cash + invested >= amt;
+      const spend = (amt) => {
+        const unmet = drawDown(amt);
+        return unmet <= 1;
+      };
+
+      // House (downpayment + loan)
+      if (!goals.house && houseCost > 0) {
+        const down = houseCost * goalCfg.house.down;
+        if (canSpend(down)) {
+          spend(down);
+          assetsHouse += houseCost;
+          addDebt({ kind: "house", principal: Math.max(0, houseCost - down), annualRate: goalCfg.house.rate, termMonths: goalCfg.house.term });
+          goals.house = { age, year: nowYear + yr };
+        }
+      }
+
+      // Car (downpayment + loan)
+      if (!goals.car && carCost > 0) {
+        const down = carCost * goalCfg.car.down;
+        if (canSpend(down)) {
+          spend(down);
+          assetsCar += carCost;
+          addDebt({ kind: "car", principal: Math.max(0, carCost - down), annualRate: goalCfg.car.rate, termMonths: goalCfg.car.term });
+          goals.car = { age, year: nowYear + yr };
+        }
+      }
+
+      // Travel (full pay, no debt)
+      if (!goals.travel && travelCost > 0) {
+        if (canSpend(travelCost)) {
+          spend(travelCost);
+          goals.travel = { age, year: nowYear + yr };
+        }
+      }
+
+      if (m % 12 === 0) {
+        yearly.push({ age: Math.round(age * 10) / 10, netWorth });
+      }
+    }
+
+    const retirement = yearly[yearly.length - 1] || { age: retireAge, netWorth: cash + invested + assetsHouse + assetsCar };
+    const retirementGap = retirementTarget0 ? retirementTarget0 - retirement.netWorth : 0;
+
+    return {
+      id: cfg.id,
+      label: cfg.label,
+      color: cfg.color,
+      yearly,
+      monthlyNetWorth,
+      goals,
+      retirement: { age: retireAge, netWorth: retirement.netWorth, target: retirementTarget0, gap: retirementGap },
+      cash: cash,
+      invested,
+      assets: { house: assetsHouse, car: assetsCar },
+      debt: { maxOutstanding: maxDebt, interestPaid: totalInterestPaid },
+    };
+  };
+
+  const PATHS = useMemo(() => ([
+    { id: "corporate", label: "Corporate Path", color: "#63b3ff", incomeMultiplier: 1.0, expenseMultiplier: 1.0, returnAdj: 0.00, growthAdj: 0.00, investRateMultiplier: 1.0 },
+    { id: "startup", label: "Startup Path", color: "#a78bfa", incomeMultiplier: 1.0, expenseMultiplier: 1.06, returnAdj: 0.015, growthAdj: 0.02, shockMonths: 24, shockMultiplier: 0.70, investRateMultiplier: 0.92 },
+    { id: "studies", label: "Higher Studies Path", color: "#34d399", incomeMultiplier: 1.0, expenseMultiplier: 1.12, returnAdj: 0.005, growthAdj: 0.01, studyMonths: 24, postStudyIncomeMultiplier: 1.55, eduDebtPrincipal: 900000, investRateMultiplier: 0.85 },
+    { id: "aggressive", label: "Aggressive Investment Path", color: "#fbbf24", incomeMultiplier: 1.0, expenseMultiplier: 0.98, returnAdj: 0.03, growthAdj: 0.00, investRateMultiplier: 1.35 },
+  ]), []);
+
+  const results = useMemo(() => {
+    return PATHS.map((p) => simulatePath(p));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [PATHS, inputs, baseAnnualReturn]);
+
+  const selected = useMemo(() => results.find((r) => r.id === selectedPath) || results[0], [results, selectedPath]);
+
+  const summaryForAI = useMemo(() => {
+    return results.map((r) => ({
+      id: r.id,
+      label: r.label,
+      netWorthAtRetirement: Math.round(r.retirement.netWorth),
+      retirementTarget: Math.round(r.retirement.target || 0),
+      retirementGap: Math.round(r.retirement.gap || 0),
+      emergencyFundAge: r.goals.emergencyFund?.age ? Math.round(r.goals.emergencyFund.age * 10) / 10 : null,
+      houseAge: r.goals.house?.age ? Math.round(r.goals.house.age * 10) / 10 : null,
+      carAge: r.goals.car?.age ? Math.round(r.goals.car.age * 10) / 10 : null,
+      travelAge: r.goals.travel?.age ? Math.round(r.goals.travel.age * 10) / 10 : null,
+      maxDebt: Math.round(r.debt.maxOutstanding),
+      interestPaid: Math.round(r.debt.interestPaid),
+    }));
+  }, [results]);
+
+  const localInsight = useMemo(() => {
+    const baseline = summaryForAI.find((x) => x.id === "corporate") || summaryForAI[0];
+    const out = {};
+    for (const s of summaryForAI) {
+      if (!baseline || s.id === baseline.id) continue;
+      const houseDelay = (s.houseAge != null && baseline.houseAge != null) ? (s.houseAge - baseline.houseAge) : null;
+      const nwDelta = s.netWorthAtRetirement - baseline.netWorthAtRetirement;
+      const parts = [];
+      if (houseDelay != null && Math.abs(houseDelay) >= 0.9) {
+        parts.push(`House timeline ${houseDelay > 0 ? "delays" : "accelerates"} by ${Math.abs(Math.round(houseDelay))} years vs corporate.`);
+      }
+      parts.push(`Retirement net worth ${nwDelta >= 0 ? "increases" : "decreases"} by ~${fmtINR(Math.abs(nwDelta))}.`);
+      if (s.maxDebt > baseline.maxDebt + 1) parts.push(`Peak debt is higher (max ~${fmtINR(s.maxDebt)}).`);
+      out[s.id] = parts.join(" ");
+    }
+    out.corporate = "Stable compounding with predictable goal timelines and moderate risk.";
+    return out;
+  }, [summaryForAI]);
+
+  const requestAIInsights = async () => {
+    setAiState((p) => ({ ...p, loading: true, err: "" }));
+    try {
+      const res = await api.pathfinderExplain({
+        inputs: {
+          age: inputs.age,
+          retirementAge: inputs.retirementAge,
+          monthlyIncome: inputs.monthlyIncome,
+          monthlyExpenses: inputs.monthlyExpenses,
+          currentSavings: inputs.currentSavings,
+          investmentRate: inputs.investmentRate,
+          salaryGrowth: inputs.salaryGrowth,
+          inflation: inputs.inflation,
+          riskTolerance: inputs.riskTolerance,
+          goals: inputs.goals,
+        },
+        scenarios: summaryForAI,
+      });
+      setAiState({ loading: false, provider: res.provider || "local", err: "", insights: res.insights || {} });
+    } catch (e) {
+      setAiState((p) => ({ ...p, loading: false, err: "AI insights temporarily unavailable. Showing local explanations." }));
+    }
+  };
+
+  const setIn = (k, v) => setInputs((p) => ({ ...p, [k]: v }));
+  const setGoal = (k, v) => setInputs((p) => ({ ...p, goals: { ...p.goals, [k]: v } }));
+
+  const MilestoneDot = ({ color }) => (
+    <span style={{ width:7, height:7, borderRadius:"50%", background:color, boxShadow:`0 0 10px ${color}`, flexShrink:0 }} />
+  );
+
+  const Panel = ({ title, subtitle, children }) => (
+    <div style={{
+      background:"radial-gradient(120% 120% at 10% 20%, rgba(99,179,255,0.10), rgba(167,139,250,0.05) 40%, rgba(255,255,255,0.02) 100%)",
+      border:"1px solid rgba(255,255,255,0.06)",
+      borderRadius:26,
+      padding: mobile ? 16 : 18,
+      boxShadow:"0 0 26px rgba(99,179,255,0.06)",
+      backdropFilter:"blur(18px)",
+    }}>
+      <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", gap:10, marginBottom:12 }}>
+        <div>
+          <div style={{ fontSize:14, fontWeight:800 }}>{title}</div>
+          {subtitle && <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.38)", marginTop:4 }}>{subtitle}</div>}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+
+  const Slider = ({ label, value, onChange, min, max, step, rightLabel }) => (
+    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:10 }}>
+        <div style={{ fontSize:12, color:"rgba(226,234,255,0.65)", fontWeight:700 }}>{label}</div>
+        <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:11, color:"rgba(226,234,255,0.55)" }}>{rightLabel}</div>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ width:"100%", accentColor:"#63b3ff" }}
+      />
+    </div>
+  );
+
+  const LineChart = ({ data }) => {
+    const w = mobile ? 320 : 760;
+    const h = mobile ? 190 : 240;
+    const pad = { l: 46, r: 18, t: 18, b: 28 };
+    const all = data.flatMap((s) => s.yearly.map((p) => p.netWorth));
+    const maxY = Math.max(1, ...all);
+    const minY = Math.min(0, ...all);
+    const ages = data[0]?.yearly?.map((p) => p.age) || [];
+    const xMin = ages[0] ?? 0;
+    const xMax = ages[ages.length - 1] ?? 1;
+
+    const x = (age) => pad.l + ((age - xMin) / (xMax - xMin || 1)) * (w - pad.l - pad.r);
+    const y = (v) => pad.t + (1 - (v - minY) / (maxY - minY || 1)) * (h - pad.t - pad.b);
+
+    const makePath = (series) => {
+      const pts = series.yearly;
+      return pts.map((p, i) => `${i ? "L" : "M"} ${x(p.age).toFixed(1)} ${y(p.netWorth).toFixed(1)}`).join(" ");
+    };
+
+    return (
+      <svg width={w} height={h} style={{ overflow:"visible" }}>
+        <defs>
+          <linearGradient id="pfGrid" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="rgba(99,179,255,0.10)" />
+            <stop offset="1" stopColor="rgba(167,139,250,0.02)" />
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width={w} height={h} rx="18" fill="url(#pfGrid)" stroke="rgba(255,255,255,0.06)" />
+        {[0.25, 0.5, 0.75].map((t) => (
+          <line key={t} x1={pad.l} x2={w - pad.r} y1={pad.t + (h - pad.t - pad.b) * t} y2={pad.t + (h - pad.t - pad.b) * t} stroke="rgba(255,255,255,0.06)" />
+        ))}
+        <line x1={pad.l} x2={pad.l} y1={pad.t} y2={h - pad.b} stroke="rgba(255,255,255,0.08)" />
+        <line x1={pad.l} x2={w - pad.r} y1={h - pad.b} y2={h - pad.b} stroke="rgba(255,255,255,0.08)" />
+
+        {data.map((s) => (
+          <path key={s.id} d={makePath(s)} fill="none" stroke={s.color} strokeWidth="2.6" opacity={s.id === selectedPath ? 1 : 0.55} style={{ filter:`drop-shadow(0 0 6px ${s.color}55)` }} />
+        ))}
+
+        <text x={pad.l} y={h - 8} fill="rgba(226,234,255,0.45)" fontSize="10" fontFamily="'JetBrains Mono', monospace">{`age ${xMin}`}</text>
+        <text x={w - pad.r} y={h - 8} fill="rgba(226,234,255,0.45)" fontSize="10" textAnchor="end" fontFamily="'JetBrains Mono', monospace">{`age ${xMax}`}</text>
+        <text x={pad.l} y={12} fill="rgba(226,234,255,0.45)" fontSize="10" fontFamily="'JetBrains Mono', monospace">{fmtINR(maxY).replace(".0", "")}</text>
+      </svg>
+    );
+  };
+
+  const milestones = useMemo(() => {
+    const m = [];
+    if (selected?.goals?.emergencyFund) m.push({ label: "Emergency fund complete", ...selected.goals.emergencyFund, color: "#34d399" });
+    if (selected?.goals?.travel) m.push({ label: "Travel goal achieved", ...selected.goals.travel, color: "#63b3ff" });
+    if (selected?.goals?.car) m.push({ label: "Car acquired", ...selected.goals.car, color: "#fbbf24" });
+    if (selected?.goals?.house) m.push({ label: "House acquired", ...selected.goals.house, color: "#a78bfa" });
+    m.push({ label: "Retirement projection", age: inputs.retirementAge, year: nowYear + Math.max(0, Math.floor(inputs.retirementAge - inputs.age)), color: "#e2eaff" });
+    return m.sort((a, b) => (a.age || 0) - (b.age || 0));
+  }, [selected, inputs.age, inputs.retirementAge]);
+
+  return (
+    <div style={{ animation:"fadeIn 0.4s ease" }}>
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:14, flexWrap:"wrap" }}>
+        <div>
+          <div style={{ fontSize:28, fontWeight:900, marginBottom:8 }}>
+            ⌬ <span style={{ background:"linear-gradient(135deg,#63b3ff,#a78bfa)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+              Pathfinder AI
+            </span>{" "}
+            <span style={{ fontSize:16, fontWeight:700, color:"rgba(226,234,255,0.65)" }}>— Life Decision Simulator</span>
+          </div>
+          <div style={{ color:"rgba(226,234,255,0.38)", fontFamily:"'JetBrains Mono', monospace", fontSize:11 }}>
+            // AI Life Planner + Parallel Life Path Simulator — recomputes instantly as you adjust inputs
+          </div>
+        </div>
+        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+          <Btn outline onClick={requestAIInsights} loading={aiState.loading}>Generate AI insights →</Btn>
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns: mobile ? "1fr" : "420px 1fr", gap:18, marginTop:18 }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+          <Panel title="Inputs" subtitle="// cashflow + goals">
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+              <div>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.55)", marginBottom:6 }}>Age</div>
+                <Input placeholder="Age" value={inputs.age} onChange={(e) => setIn("age", clamp(Number(e.target.value), 14, 75))} icon="⌁" />
+              </div>
+              <div>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.55)", marginBottom:6 }}>Retirement age</div>
+                <Input placeholder="Retirement age" value={inputs.retirementAge} onChange={(e) => setIn("retirementAge", clamp(Number(e.target.value), inputs.age + 1, 85))} icon="⟠" />
+              </div>
+              <div>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.55)", marginBottom:6 }}>Monthly income</div>
+                <Input placeholder="Monthly income" value={inputs.monthlyIncome} onChange={(e) => setIn("monthlyIncome", Math.max(0, Number(e.target.value)))} icon="₹" />
+              </div>
+              <div>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.55)", marginBottom:6 }}>Monthly expenses</div>
+                <Input placeholder="Monthly expenses" value={inputs.monthlyExpenses} onChange={(e) => setIn("monthlyExpenses", Math.max(0, Number(e.target.value)))} icon="↯" />
+              </div>
+              <div style={{ gridColumn:"1 / -1" }}>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.55)", marginBottom:6 }}>Current savings</div>
+                <Input placeholder="Current savings" value={inputs.currentSavings} onChange={(e) => setIn("currentSavings", Math.max(0, Number(e.target.value)))} icon="◈" />
+              </div>
+            </div>
+
+            <div style={{ marginTop:14, display:"flex", flexDirection:"column", gap:14 }}>
+              <Slider
+                label="Investment rate"
+                value={Math.round(inputs.investmentRate * 100)}
+                min={0}
+                max={85}
+                step={1}
+                rightLabel={`${Math.round(inputs.investmentRate * 100)}% of income`}
+                onChange={(v) => setIn("investmentRate", clamp(v / 100, 0, 0.85))}
+              />
+              <Slider
+                label="Salary growth"
+                value={Math.round(inputs.salaryGrowth * 100)}
+                min={0}
+                max={22}
+                step={1}
+                rightLabel={`${Math.round(inputs.salaryGrowth * 100)}% / year`}
+                onChange={(v) => setIn("salaryGrowth", clamp(v / 100, 0, 0.25))}
+              />
+              <Slider
+                label="Inflation"
+                value={Math.round(inputs.inflation * 100)}
+                min={0}
+                max={14}
+                step={1}
+                rightLabel={`${Math.round(inputs.inflation * 100)}% / year`}
+                onChange={(v) => setIn("inflation", clamp(v / 100, 0, 0.18))}
+              />
+              <Slider
+                label="Risk tolerance"
+                value={inputs.riskTolerance}
+                min={0}
+                max={100}
+                step={1}
+                rightLabel={`return ~${Math.round(baseAnnualReturn * 100)}% / year`}
+                onChange={(v) => setIn("riskTolerance", clamp(v, 0, 100))}
+              />
+            </div>
+          </Panel>
+
+          <Panel title="Goals" subtitle="// amounts in today's ₹">
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+              <div>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.55)", marginBottom:6 }}>House</div>
+                <Input placeholder="House goal" value={inputs.goals.house} onChange={(e) => setGoal("house", Math.max(0, Number(e.target.value)))} icon="⌂" />
+              </div>
+              <div>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.55)", marginBottom:6 }}>Car</div>
+                <Input placeholder="Car goal" value={inputs.goals.car} onChange={(e) => setGoal("car", Math.max(0, Number(e.target.value)))} icon="⎈" />
+              </div>
+              <div>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.55)", marginBottom:6 }}>Travel</div>
+                <Input placeholder="Travel goal" value={inputs.goals.travel} onChange={(e) => setGoal("travel", Math.max(0, Number(e.target.value)))} icon="✦" />
+              </div>
+              <div>
+                <div style={{ fontSize:11, color:"rgba(226,234,255,0.55)", marginBottom:6 }}>Retirement corpus</div>
+                <Input placeholder="Retirement goal" value={inputs.goals.retirement} onChange={(e) => setGoal("retirement", Math.max(0, Number(e.target.value)))} icon="⟠" />
+              </div>
+            </div>
+            <div style={{ marginTop:12, fontSize:11, color:"rgba(226,234,255,0.4)", fontFamily:"'JetBrains Mono', monospace" }}>
+              // House + Car use downpayment + loan; Travel requires full funding; Retirement checks corpus at age {inputs.retirementAge}.
+            </div>
+          </Panel>
+        </div>
+
+        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+          <Panel title="Parallel Futures" subtitle="// side-by-side comparison">
+            <div style={{ display:"grid", gridTemplateColumns: mobile ? "1fr" : "repeat(4, minmax(0, 1fr))", gap:10 }}>
+              {results.map((r) => {
+                const a = summaryForAI.find((x) => x.id === r.id);
+                const isA = r.id === selectedPath;
+                return (
+                  <button key={r.id} onClick={() => setSelectedPath(r.id)} style={{
+                    textAlign:"left",
+                    padding:14,
+                    borderRadius:22,
+                    background: isA ? `${r.color}18` : "rgba(255,255,255,0.02)",
+                    border: isA ? `1px solid ${r.color}55` : "1px solid rgba(255,255,255,0.06)",
+                    boxShadow: isA ? `0 0 18px ${r.color}22` : "none",
+                    transition:"all 0.18s ease",
+                  }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+                      <div style={{ fontSize:12, fontWeight:900, color:"#eef6ff" }}>{r.label.replace(" Path", "")}</div>
+                      <MilestoneDot color={r.color} />
+                    </div>
+                    <div style={{ marginTop:10, fontSize:10, color:"rgba(226,234,255,0.45)", fontFamily:"'JetBrains Mono', monospace" }}>Retirement net worth</div>
+                    <div style={{ fontSize:14, fontWeight:900, marginTop:3 }}>{fmtINR(r.retirement.netWorth)}</div>
+                    <div style={{ marginTop:8, display:"flex", justifyContent:"space-between", gap:8, fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.5)" }}>
+                      <span>Peak debt</span>
+                      <span>{fmtINR(a?.maxDebt || 0)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </Panel>
+
+          <Panel title="Net Worth Growth" subtitle="// line chart across paths">
+            <div style={{ display:"flex", flexWrap:"wrap", gap:10, alignItems:"center", marginBottom:10 }}>
+              {results.map((r) => (
+                <div key={`legend-${r.id}`} style={{ display:"flex", alignItems:"center", gap:8, fontSize:11, color:"rgba(226,234,255,0.6)" }}>
+                  <MilestoneDot color={r.color} />
+                  <span style={{ fontFamily:"'JetBrains Mono', monospace" }}>{r.label.replace(" Path", "")}</span>
+                </div>
+              ))}
+            </div>
+            <LineChart data={results} />
+          </Panel>
+
+          <Panel title="Life Roadmap" subtitle="// milestones + goal timelines">
+            <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", marginBottom:10 }}>
+              <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.45)" }}>Selected path</div>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                {results.map((r) => {
+                  const isA = r.id === selectedPath;
+                  return (
+                    <button key={`pill-${r.id}`} onClick={() => setSelectedPath(r.id)} style={{
+                      padding:"7px 10px",
+                      borderRadius:999,
+                      border: `1px solid ${isA ? `${r.color}66` : "rgba(255,255,255,0.06)"}`,
+                      background: isA ? `${r.color}1a` : "rgba(255,255,255,0.02)",
+                      color: isA ? "#e2eaff" : "rgba(226,234,255,0.55)",
+                      fontSize:11,
+                      fontWeight:700,
+                      transition:"all 0.18s ease",
+                    }}>{r.label.replace(" Path", "")}</button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display:"grid", gridTemplateColumns: mobile ? "1fr" : "1.1fr 0.9fr", gap:14, alignItems:"start" }}>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {milestones.map((m, i) => (
+                  <div key={`ms-${m.label}-${i}`} style={{
+                    display:"flex",
+                    gap:10,
+                    alignItems:"flex-start",
+                    padding:"12px 14px",
+                    borderRadius:20,
+                    background:"rgba(255,255,255,0.02)",
+                    border:"1px solid rgba(255,255,255,0.06)",
+                  }}>
+                    <MilestoneDot color={m.color} />
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:12, fontWeight:900 }}>{m.label}</div>
+                      <div style={{ marginTop:4, fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.45)" }}>
+                        {m.age ? `Age ~${Math.round(m.age)} · Year ${m.year}` : `Age ${inputs.retirementAge} · Year ${m.year}`}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{
+                borderRadius:22,
+                border:"1px solid rgba(255,255,255,0.06)",
+                background:"rgba(255,255,255,0.02)",
+                padding:14,
+              }}>
+                <div style={{ fontSize:12, fontWeight:900, marginBottom:10 }}>Projection summary</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", gap:10, fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.5)" }}>
+                    <span>Retirement net worth</span>
+                    <span style={{ color:"#e2eaff", fontWeight:900 }}>{fmtINR(selected?.retirement?.netWorth || 0)}</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", gap:10, fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.5)" }}>
+                    <span>Retirement target</span>
+                    <span style={{ color:"#e2eaff", fontWeight:900 }}>{fmtINR(selected?.retirement?.target || 0)}</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", gap:10, fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.5)" }}>
+                    <span>Gap</span>
+                    <span style={{ color:(selected?.retirement?.gap || 0) <= 0 ? "#34d399" : "#f87171", fontWeight:900 }}>
+                      {fmtINR(Math.abs(selected?.retirement?.gap || 0))}{(selected?.retirement?.gap || 0) <= 0 ? " surplus" : " short"}
+                    </span>
+                  </div>
+                  <div style={{ height:1, background:"rgba(255,255,255,0.06)" }} />
+                  <div style={{ display:"flex", justifyContent:"space-between", gap:10, fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.5)" }}>
+                    <span>Peak debt</span>
+                    <span style={{ color:"#e2eaff", fontWeight:900 }}>{fmtINR(selected?.debt?.maxOutstanding || 0)}</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", gap:10, fontFamily:"'JetBrains Mono', monospace", fontSize:10, color:"rgba(226,234,255,0.5)" }}>
+                    <span>Interest paid (est.)</span>
+                    <span style={{ color:"#e2eaff", fontWeight:900 }}>{fmtINR(selected?.debt?.interestPaid || 0)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel title="AI Explanations" subtitle={`// provider: ${aiState.provider}`}>
+            {aiState.err && <div style={{ marginBottom:10, color:"#f87171", fontSize:12 }}>{aiState.err}</div>}
+            <div style={{ display:"grid", gridTemplateColumns: mobile ? "1fr" : "repeat(2, minmax(0, 1fr))", gap:10 }}>
+              {results.map((r) => {
+                const text = (aiState.insights && aiState.insights[r.id]) || localInsight[r.id] || "";
+                return (
+                  <div key={`ins-${r.id}`} style={{
+                    padding:14,
+                    borderRadius:22,
+                    border:"1px solid rgba(255,255,255,0.06)",
+                    background:"rgba(255,255,255,0.02)",
+                  }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10 }}>
+                      <div style={{ fontSize:12, fontWeight:900 }}>{r.label}</div>
+                      <MilestoneDot color={r.color} />
+                    </div>
+                    <div style={{ marginTop:10, fontSize:12, lineHeight:1.55, color:"rgba(226,234,255,0.78)" }}>
+                      {text || "Generate AI insights to see narrative trade-offs across paths."}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Panel>
+        </div>
       </div>
     </div>
   );
@@ -3850,6 +4537,7 @@ function Shell({ token, initialBankerToken = "" }) {
     loan: <Loan />,
     fraud: <Fraud />,
     ai: <AskAstro updates={updates} customerProfile={customerProfile} />,
+    pathfinder: <PathfinderAI />,
     analytics: <Analytics updates={updates} />,
     settings: <Settings user={user} />,
   };

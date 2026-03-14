@@ -30,6 +30,34 @@ function strictLanguageInstruction(language) {
   return "Respond in English.";
 }
 
+function fmtINR(n = 0) {
+  const v = Math.round(Number(n || 0));
+  return `₹${v.toLocaleString("en-IN")}`;
+}
+
+function buildLocalPathfinderInsights(scenarios = []) {
+  const byId = Object.fromEntries(scenarios.map((s) => [s.id, s]));
+  const base = byId.corporate || scenarios[0];
+  const out = {};
+  for (const s of scenarios) {
+    if (!s?.id) continue;
+    if (!base || s.id === base.id) {
+      out[s.id] = "Stable compounding with predictable goal timelines and moderate risk.";
+      continue;
+    }
+    const parts = [];
+    if (Number.isFinite(base.houseAge) && Number.isFinite(s.houseAge)) {
+      const d = s.houseAge - base.houseAge;
+      if (Math.abs(d) >= 0.9) parts.push(`House goal ${d > 0 ? "delays" : "accelerates"} by ~${Math.abs(Math.round(d))} years vs corporate.`);
+    }
+    const nwDelta = (s.netWorthAtRetirement || 0) - (base.netWorthAtRetirement || 0);
+    parts.push(`Retirement net worth ${nwDelta >= 0 ? "increases" : "decreases"} by ~${fmtINR(Math.abs(nwDelta))}.`);
+    if ((s.maxDebt || 0) > (base.maxDebt || 0) + 1) parts.push(`Peak debt is higher (max ~${fmtINR(s.maxDebt || 0)}).`);
+    out[s.id] = parts.join(" ");
+  }
+  return out;
+}
+
 export default async function handler(req, res) {
   const url = new URL(req.url || "", "http://localhost");
   const path = url.pathname || "";
@@ -105,6 +133,38 @@ Instructions: Analyse loans, overall financial health, and provide a tailored in
     const generated = await generateAssistantReply(prompt);
     let reply = generated.reply || fallbackReply(message, profile, language);
     return res.status(200).json({ reply, provider: generated.provider || "local" });
+  }
+
+  if (path === "/api/ai/pathfinder-explain") {
+    if (req.method !== "POST") return methodNotAllowed(res);
+    const body = getBody(req);
+    const inputs = body?.inputs || {};
+    const scenarios = Array.isArray(body?.scenarios) ? body.scenarios.slice(0, 8) : [];
+
+    const scenarioList = scenarios
+      .map((s) => `- ${s.id} (${s.label}): retirementNW ${s.netWorthAtRetirement}, target ${s.retirementTarget}, gap ${s.retirementGap}; emergencyAge ${s.emergencyFundAge}; houseAge ${s.houseAge}; carAge ${s.carAge}; travelAge ${s.travelAge}; peakDebt ${s.maxDebt}; interestPaid ${s.interestPaid}`)
+      .join("\n");
+
+    const prompt = `You are Astro, a concise financial copilot. Write one crisp, concrete trade-off insight per scenario.
+User inputs: age ${inputs.age}, retirementAge ${inputs.retirementAge}, income ${inputs.monthlyIncome}/mo, expenses ${inputs.monthlyExpenses}/mo, savings ${inputs.currentSavings}, investRate ${inputs.investmentRate}, salaryGrowth ${inputs.salaryGrowth}, inflation ${inputs.inflation}, riskTolerance ${inputs.riskTolerance}.
+Scenario summaries:
+${scenarioList}
+Output EXACTLY one line per scenario, in this format:
+<id>: <one sentence insight mentioning at least one timeline impact (house/car/travel/emergency) AND one wealth impact (retirement net worth).
+No markdown, no bullets, no extra lines.`;
+
+    const generated = await generateAssistantReply(prompt);
+    const text = `${generated.reply || ""}`.trim();
+    const insights = {};
+    if (text) {
+      for (const line of text.split(/\r?\n/)) {
+        const m = line.match(/^([a-z0-9_-]+)\s*:\s*(.+)$/i);
+        if (!m) continue;
+        insights[m[1]] = m[2].trim();
+      }
+    }
+    const finalInsights = Object.keys(insights).length ? insights : buildLocalPathfinderInsights(scenarios);
+    return res.status(200).json({ insights: finalInsights, provider: generated.provider || "local" });
   }
 
   // Voice
